@@ -10,14 +10,71 @@ except ImportError as e:
     CV2_IMPORT_ERROR = e
 import os
 import plotly.graph_objects as go
+import json
+from datetime import datetime
+import base64
+import io
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+HISTORY_FILE = os.path.join(BASE_DIR, "riwayat_klasifikasi.json")
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 if cv2 is None:
     raise ImportError(
         "OpenCV is required by this app. Please install 'opencv-python-headless' in requirements.txt."
     )
+
+
+def load_history():
+    """Load history from JSON file."""
+    if os.path.exists(HISTORY_FILE):
+        try:
+            with open(HISTORY_FILE, "r") as f:
+                return json.load(f)
+        except:
+            return []
+    return []
+
+
+def save_history(history):
+    """Save history to JSON file."""
+    try:
+        with open(HISTORY_FILE, "w") as f:
+            json.dump(history, f, indent=2)
+    except Exception as e:
+        st.warning(f"⚠️ Gagal menyimpan riwayat: {e}")
+
+
+def add_to_history(is_b3, confidence, img_pil):
+    """Add a new classification to history."""
+    history = load_history()
+    
+    # Convert image to base64
+    buffered = io.BytesIO()
+    img_pil.save(buffered, format="JPEG", quality=85)
+    img_b64 = base64.b64encode(buffered.getvalue()).decode()
+    
+    # Create history entry
+    entry = {
+        "id": datetime.now().strftime("%Y%m%d_%H%M%S_%f"),
+        "timestamp": datetime.now().strftime("%d %B %Y, %H:%M:%S"),
+        "is_b3": is_b3,
+        "verdict": "B3" if is_b3 else "non-B3",
+        "confidence": float(confidence),
+        "source": "web",
+        "thumb_b64": img_b64
+    }
+    
+    history.insert(0, entry)
+    save_history(history)
+    return entry
+
+
+def delete_history_item(item_id):
+    """Delete a history item by ID."""
+    history = load_history()
+    history = [h for h in history if h.get("id") != item_id]
+    save_history(history)
 
 st.set_page_config(
     page_title="B3 Waste Detector",
@@ -400,6 +457,10 @@ with col_left:
         pred_proba = float(model.predict(arr, verbose=0)[0][0])
         is_b3      = pred_proba < THRESHOLD
 
+        # Save to history
+        conf_val = 1.0 - pred_proba if is_b3 else pred_proba
+        add_to_history(is_b3, conf_val, img_source)
+
         with st.spinner("🔍 Mendeteksi objek..."):
             yolo_boxes = run_yolo(yolo_model, img_source)
 
@@ -515,3 +576,44 @@ with col_right:
 st.markdown("""<div class="footer">
     B3 Waste Detector &nbsp;·&nbsp; MobileNetV2 + YOLOv8 &nbsp;·&nbsp; TensorFlow &nbsp;·&nbsp; Streamlit
 </div>""", unsafe_allow_html=True)
+
+# ── History Section ──
+st.markdown("<div style='margin-top: 3rem;'></div>", unsafe_allow_html=True)
+st.markdown("<h3 style='text-align: center; color: #1e293b;'>📋 Riwayat Klasifikasi</h3>", unsafe_allow_html=True)
+
+history = load_history()
+
+if not history:
+    st.info("📭 Belum ada riwayat klasifikasi. Mulai dengan mengupload gambar!")
+else:
+    # Display history in columns
+    for i, item in enumerate(history):
+        col1, col2, col3 = st.columns([2, 3, 1])
+        
+        with col1:
+            if item.get("thumb_b64"):
+                try:
+                    img_data = base64.b64decode(item["thumb_b64"])
+                    img = Image.open(io.BytesIO(img_data))
+                    st.image(img, use_container_width=True)
+                except:
+                    st.text("❌ Gambar tidak tersedia")
+        
+        with col2:
+            verdict = item.get("verdict", "unknown")
+            confidence = item.get("confidence", 0)
+            timestamp = item.get("timestamp", "")
+            
+            color = "🔴" if item.get("is_b3") else "🟢"
+            st.markdown(f"""
+            **{color} {verdict}**  
+            Confidence: {confidence:.1%}  
+            Waktu: {timestamp}
+            """)
+        
+        with col3:
+            if st.button("🗑️ Hapus", key=f"delete_{item.get('id', i)}", use_container_width=True):
+                delete_history_item(item.get("id"))
+                st.rerun()
+        
+        st.divider()
