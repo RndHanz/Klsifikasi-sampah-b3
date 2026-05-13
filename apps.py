@@ -419,6 +419,52 @@ if yolo_ok:
 else:
     st.markdown('<div class="status-bar status-warn">⚠️ &nbsp;YOLOv8 tidak tersedia — install: <code>pip install ultralytics</code></div>', unsafe_allow_html=True)
 
+# ── Info Umum B3 ──
+with st.expander("ℹ️ **Apa itu Sampah B3? Pelajari lebih lanjut**", expanded=False):
+    st.markdown("""
+    ### 🔴 **Sampah B3 (Bahan Berbahaya & Beracun)**
+    
+    **Pengertian:**  
+    Sampah B3 adalah limbah yang mengandung bahan kimia berbahaya, beracun, atau dapat merusak lingkungan dan kesehatan manusia.
+    
+    **Contoh Sampah B3 yang umum:**
+    - 🔋 **Baterai** (batu, charge, alkaline) — mengandung merkuri dan timbal
+    - 🎨 **Cat & thinner** — beracun jika terhirup atau terserap kulit
+    - 💧 **Oli bekas mesin** — mencemari tanah dan air
+    - 💊 **Obat-obatan kadaluarsa** — dapat meracuni organisme
+    - 💡 **Lampu neon/TL** — mengandung raksa (merkuri)
+    - 🧴 **Pestisida & insektisida** — sangat beracun
+    - 📱 **Limbah elektronik (e-waste)** — mengandung logam berat
+    - 🧪 **Cairan pembersih (bleach, pembersih kaca)** — korosif dan beracun
+    
+    **Ciri-ciri Sampah B3:**
+    - Berasal dari industri, laboratorium, atau produk konsumsi
+    - Memiliki label peringatan ⚠️ atau ☠️
+    - Dapat meledak, terbakar, atau bereaksi dengan air
+    - Berbau aneh atau menyebabkan iritasi
+    
+    ---
+    
+    ### 🟢 **Sampah Non-B3 (Sampah Biasa)**
+    
+    **Pengertian:**  
+    Sampah Non-B3 adalah limbah organik dan anorganik yang tidak mengandung bahan berbahaya dan dapat didaur ulang atau dikompos.
+    
+    **Contoh Sampah Non-B3:**
+    - 🥕 **Limbah organik:** sisa makanan, kulit buah, daun, rumput
+    - 📄 **Kertas & kardus** — dapat di-daur ulang
+    - 🥫 **Plastik & botol** — dapat didaur ulang
+    - 🥤 **Kaca** — 100% dapat di-daur ulang
+    - 🪨 **Logam (aluminium, besi)** — dapat didaur ulang
+    - 🧵 **Kain & pakaian lama** — dapat digunakan ulang
+    
+    **Ciri-ciri Sampah Non-B3:**
+    - Tidak berbau menyengat atau hanya berbau normal
+    - Dapat terurai secara alami
+    - Aman ditangani dengan tangan
+    - Tidak memiliki label peringatan
+    """)
+
 # ── Layout ──
 pred_proba = None; is_b3 = None; img_source = None
 col_left, col_right = st.columns([1.1, 0.9], gap="large")
@@ -498,6 +544,53 @@ with col_right:
                 <div class="v-status v-status-b3">⚠ BAHAN BERBAHAYA & BERACUN</div>
                 <div class="v-desc">Sampah ini terdeteksi mengandung bahan berbahaya.<br>Diperlukan penanganan &amp; pembuangan khusus.</div>
             </div>""", unsafe_allow_html=True)
+            
+            with st.expander("📖 Kenapa terdeteksi sebagai B3? Baca penjelasannya", expanded=False):
+                st.warning("""
+                **Alasan Klasifikasi B3:**
+                
+                Sampah B3 dideteksi berdasarkan ciri visual:
+                - Bentuk dan tekstur yang mirip dengan wadah/kemasan bahan berbahaya
+                - Warna karakteristik (merah, kuning, hitam) yang menunjukkan peringatan
+                - Fitur visual yang mirip dengan produk berbahaya yang dikenal
+                
+                **Contoh sampah yang termasuk B3:**
+                - 🔋 Baterai bekas
+                - 🎨 Kaleng cat atau tinner
+                - 💾 Aki/accu mobil
+                - 💡 Lampu merkuri/neon
+                - 🧴 Botol cairan pembersih atau pestisida
+                - 🔧 Oli mesin bekas
+                """)
+            
+            st.markdown("""<div class="tip tip-b3">
+                <b>⚠️ CARA PENANGANAN SAMPAH B3 (PENTING!)</b><br>
+                
+                <b>1️⃣ JANGAN LAKUKAN:</b>
+                • ❌ Jangan buang ke tempat sampah biasa
+                • ❌ Jangan bakar atau musnahkan sendiri
+                • ❌ Jangan campur dengan sampah rumah tangga
+                • ❌ Jangan buang ke sungai atau tanah
+                • ❌ Jangan biarkan terkena hujan (bisa bocor ke tanah)
+                
+                <b>2️⃣ YANG HARUS DILAKUKAN:</b>
+                • ✅ Simpan di tempat yang kering & tertutup rapat
+                • ✅ Berikan label/tanda jelas "SAMPAH B3"
+                • ✅ Jauhkan dari anak-anak dan hewan peliharaan
+                • ✅ Kumpulkan di satu tempat yang aman
+                
+                <b>3️⃣ KEMANA HARUS DIBUANG:</b>
+                • 🏢 <b>TPA B3</b> (Tempat Pemrosesan Akhir B3 resmi)
+                • 🏭 <b>Jasa pengolahan limbah B3</b> (di kota besar)
+                • 🏪 <b>Tempat pembelian asli</b> (menerima produk bekas)
+                • 📞 Hubungi <b>Dinas Lingkungan Hidup</b> setempat untuk informasi lokasi TPA B3
+                
+                <b>❗ RISIKO KESEHATAN JIKA TIDAK DITANGANI:</b>
+                • 🤒 Keracunan (akut atau kronis)
+                • 🫁 Gangguan pernapasan & kanker
+                • 🧠 Kerusakan organ
+                • 🌍 Pencemaran lingkungan jangka panjang
+            </div>""", unsafe_allow_html=True)
         else:
             st.markdown(f"""
             <div class="verdict-card verdict-safe">
@@ -505,6 +598,55 @@ with col_right:
                 <div class="v-label v-label-safe">non-B3</div>
                 <div class="v-status v-status-safe">✓ AMAN — TIDAK BERBAHAYA</div>
                 <div class="v-desc">Sampah ini tidak terdeteksi berbahaya.<br>Dapat diproses melalui daur ulang biasa.</div>
+            </div>""", unsafe_allow_html=True)
+            
+            with st.expander("📖 Kenapa terdeteksi sebagai Non-B3? Baca penjelasannya", expanded=False):
+                st.info("""
+                **Alasan Klasifikasi Non-B3:**
+                
+                Sampah Non-B3 dideteksi berdasarkan ciri visual:
+                - Bentuk dan tekstur sampah organik biasa (plastik, kertas, kaca, dll)
+                - Warna netral tanpa tanda peringatan
+                - Tidak ada fitur visual yang menunjukkan bahan berbahaya
+                
+                **Contoh sampah Non-B3 yang umum:**
+                - 📄 Kertas, kardus, koran
+                - 🍌 Sisa makanan, kulit buah
+                - 🥤 Botol plastik, tas plastik
+                - 🥫 Kaleng minuman (bukan cairan berbahaya)
+                - 🪨 Kaca, batu, tanah
+                • 👕 Pakaian lama, kain
+                """)
+            
+            st.markdown("""<div class="tip tip-safe">
+                <b>✅ CARA MENGELOLA SAMPAH NON-B3</b><br>
+                
+                <b>1️⃣ PISAHKAN SAMPAH BERDASARKAN JENIS:</b>
+                • 🟢 <b>ORGANIK:</b> Sisa makanan, kulit buah, daun → Kompos
+                • 🟡 <b>PLASTIK:</b> Botol, tas, kemasan → Daur ulang plastik
+                • 🟦 <b>KERTAS:</b> Kardus, koran, kertas → Daur ulang kertas
+                • 🟫 <b>LOGAM:</b> Kaleng, besi, aluminium → Daur ulang logam
+                • ⚪ <b>KACA:</b> Botol, gelas → Daur ulang kaca
+                
+                <b>2️⃣ PERSIAPAN SEBELUM DIBUANG:</b>
+                • 🧼 Cuci bersih wadah plastik/kaca
+                • 📦 Pisahkan dari sampah basah/lembab
+                • 📏 Kompakkan untuk menghemat tempat
+                • 🏷️ Beri label jenis sampah jika perlu
+                
+                <b>3️⃣ OPSI PENANGANAN:</b>
+                • 🏪 <b>Bank Sampah/TPS 3R</b> (tukar dengan uang/barang)
+                • 🏭 <b>Pusat Daur Ulang lokal</b>
+                • 🚚 <b>Pengepul sampah</b> (untuk jumlah besar)
+                • 🪴 <b>Komposter rumah</b> (untuk sampah organik)
+                • 🗑️ <b>Tempat sampah biasa</b> (jika tidak bisa didaur ulang)
+                
+                <b>💚 MANFAAT MENGELOLA NON-B3 DENGAN BAIK:</b>
+                • ♻️ Mengurangi sampah ke TPA (memperpanjang umur TPA)
+                • 💰 Mendapat uang tambahan dari bank sampah
+                • 🌍 Menjaga kelestarian lingkungan
+                • 🏭 Mengurangi produksi sampah baru
+                • 🌱 Mengurangi emisi CO₂
             </div>""", unsafe_allow_html=True)
 
         st.markdown(f"""
@@ -523,7 +665,6 @@ with col_right:
             </div>
         </div>""", unsafe_allow_html=True)
 
-        gauge_val=conf_b3*100; gauge_color="#ef4444" if is_b3 else "#22c55e"
         fig_g=go.Figure(go.Indicator(
             mode="gauge+number", value=gauge_val,
             number={"suffix":"%","font":{"size":26,"color":gauge_color,"family":"Plus Jakarta Sans"}},
@@ -556,22 +697,6 @@ with col_right:
                                 <span class="obj-conf">{conf:.0%}</span>
                                 <span class="obj-size">{x2-x1}×{y2-y1}px</span>
                                 </div>""", unsafe_allow_html=True)
-
-        if is_b3:
-            st.markdown("""<div class="tip tip-b3">
-                <b>⚠ Cara Penanganan Sampah B3</b><br>
-                • Jangan buang ke tempat sampah rumah tangga biasa<br>
-                • Simpan di wadah tertutup rapat dan berlabel jelas<br>
-                • Serahkan ke fasilitas pengolahan limbah B3 resmi<br>
-                • Contoh: baterai, cat, pestisida, oli bekas, lampu neon
-            </div>""", unsafe_allow_html=True)
-        else:
-            st.markdown("""<div class="tip tip-safe">
-                <b>✓ Tips Daur Ulang non-B3</b><br>
-                • Pisahkan organik, plastik, kertas, dan logam<br>
-                • Cuci bersih wadah plastik/kaca sebelum dibuang<br>
-                • Manfaatkan bank sampah atau TPS 3R terdekat
-            </div>""", unsafe_allow_html=True)
 
 st.markdown("""<div class="footer">
     B3 Waste Detector &nbsp;·&nbsp; MobileNetV2 + YOLOv8 &nbsp;·&nbsp; TensorFlow &nbsp;·&nbsp; Streamlit
