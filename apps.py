@@ -3,12 +3,21 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 import tensorflow as tf
 from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
-import cv2
+try:
+    import cv2
+except ImportError as e:
+    cv2 = None
+    CV2_IMPORT_ERROR = e
 import os
 import plotly.graph_objects as go
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+
+if cv2 is None:
+    raise ImportError(
+        "OpenCV is required by this app. Please install 'opencv-python-headless' in requirements.txt."
+    )
 
 st.set_page_config(
     page_title="B3 Waste Detector",

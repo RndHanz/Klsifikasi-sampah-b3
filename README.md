@@ -124,6 +124,7 @@ git push -u origin main
   - Di `Advanced settings`, pilih Python versi `3.12`
   - Streamlit akan install `requirements.txt`
   - Jika tersedia, pilih `python-3.12` agar `tensorflow` dapat terpasang dengan benar
+  - Gunakan `opencv-python-headless` alih-alih `opencv-python` untuk deployment Streamlit Cloud
   - Jika masih gagal, coba ganti `tensorflow==2.16.2` atau `tensorflow==2.18.1`
 
 ---
