@@ -7,6 +7,7 @@ import cv2
 import os
 import plotly.graph_objects as go
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 st.set_page_config(
@@ -153,7 +154,7 @@ def load_classifier():
     class CDC(tf.keras.layers.DepthwiseConv2D):
         def __init__(self, **kw): super().__init__(**_s(kw))
     return tf.keras.models.load_model(
-        "model_b3.h5",
+        os.path.join(BASE_DIR, "model_b3.h5"),
         custom_objects={"BatchNormalization":CBN,"InputLayer":CIL,"Dense":CD,"Conv2D":CC,"DepthwiseConv2D":CDC},
         compile=False
     )
@@ -163,9 +164,11 @@ def load_classifier():
 def load_yolo():
     try:
         from ultralytics import YOLO
-        for p in ["best.pt","yolov8n.pt"]:
-            if os.path.exists(p): return YOLO(p)
-        return YOLO("yolov8n.pt")
+        for fname in ["best.pt","yolov8n.pt"]:
+            path = os.path.join(BASE_DIR, fname)
+            if os.path.exists(path):
+                return YOLO(path)
+        return None
     except Exception:
         return None
 

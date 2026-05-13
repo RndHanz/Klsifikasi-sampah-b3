@@ -99,6 +99,32 @@ EXTRACT_DIR = "path/ke/dataset"       # folder ekstraksi
 
 ---
 
+## 🌐 Deploy ke Streamlit Community
+- Pastikan repo hanya berisi:
+  - `app.py` atau `apps.py` (sesuaikan entrypoint Streamlit)
+  - `requirements.txt`
+  - `model_b3.h5`
+  - `yolov8n.pt`
+  - `README.md`
+- Dataset besar tidak perlu dipush ke GitHub.
+  - Folder `dataset/` sudah di-ignore oleh `.gitignore`.
+  - Streamlit Community hanya membutuhkan model terlatih, bukan dataset pelatihan.
+- Jika menggunakan repo baru, jalankan:
+
+```bash
+git init
+git add .
+git commit -m "Initial commit"
+git remote add origin https://github.com/<username>/<repo>.git
+git push -u origin main
+```
+- Setelah repo berada di GitHub, buat Streamlit project dari repo tersebut.
+  - Pilih branch `main`
+  - Pastikan entrypoint adalah `app.py`
+  - Streamlit akan install `requirements.txt`
+
+---
+
 ## 🚀 Menjalankan Aplikasi Streamlit
 
 ### Prasyarat
