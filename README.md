@@ -120,7 +120,8 @@ git push -u origin main
 ```
 - Setelah repo berada di GitHub, buat Streamlit project dari repo tersebut.
   - Pilih branch `main`
-  - Pastikan entrypoint adalah `app.py`
+  - Pastikan entrypoint adalah `apps.py`
+  - Di `Advanced settings`, pilih Python versi `3.12`
   - Streamlit akan install `requirements.txt`
 
 ---
