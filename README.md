@@ -123,6 +123,7 @@ git push -u origin main
   - Pastikan entrypoint adalah `apps.py`
   - Di `Advanced settings`, pilih Python versi `3.12`
   - Streamlit akan install `requirements.txt`
+  - Jika tersedia, pilih `python-3.12` agar `tensorflow` dapat terpasang dengan benar
 
 ---
 
