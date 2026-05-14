@@ -1,13 +1,12 @@
 import streamlit as st
 import numpy as np
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageFilter
 import tensorflow as tf
 from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
 try:
     import cv2
 except ImportError as e:
     cv2 = None
-    CV2_IMPORT_ERROR = e
 import os
 import json
 import base64
@@ -15,16 +14,10 @@ import io
 from datetime import datetime
 import streamlit.components.v1 as components
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR    = os.path.dirname(os.path.abspath(__file__))
 STORAGE_KEY = "b3_detector_history_v2"
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
-if cv2 is None:
-    raise ImportError("OpenCV diperlukan. Install: pip install opencv-python-headless")
-
-# ══════════════════════════════════════════════════════════════
-# CSS — Konsisten light mode, teks hitam
-# ══════════════════════════════════════════════════════════════
 st.set_page_config(
     page_title="B3 Waste Detector",
     page_icon="♻️",
@@ -32,11 +25,13 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
+# ══════════════════════════════════════════════════════════════
+# CSS
+# ══════════════════════════════════════════════════════════════
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
 
-/* ── Reset & Base ── */
 html, body, [class*="css"], .stApp {
     font-family: 'Plus Jakarta Sans', sans-serif !important;
     background: #f0f2f8 !important;
@@ -45,7 +40,6 @@ html, body, [class*="css"], .stApp {
 .block-container { padding: 0 2rem 3rem !important; max-width: 1200px; }
 #MainMenu, footer, header { visibility: hidden; }
 
-/* ── Topbar ── */
 .topbar {
     background: linear-gradient(135deg, #1a1f3a 0%, #1e3a8a 60%, #1d4ed8 100%);
     margin: 0 -2rem 2rem; padding: 1.2rem 2.5rem;
@@ -64,21 +58,13 @@ html, body, [class*="css"], .stApp {
     font-size: 0.62rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
     padding: 0.35rem 0.9rem; border-radius: 20px; border: 1px solid rgba(255,255,255,0.2);
 }
-
-/* ── Status bar ── */
-.status-bar {
-    border-radius: 10px; padding: 0.65rem 1rem;
-    font-size: 0.75rem; font-weight: 600; margin-bottom: 1.5rem;
-    color: #111827;
-}
+.status-bar { border-radius: 10px; padding: 0.65rem 1rem; font-size: 0.75rem; font-weight: 600; margin-bottom: 1.5rem; }
 .status-ok  { background: #f0fdf4; border: 1px solid #bbf7d0; color: #15803d; }
 .status-warn{ background: #fffbeb; border: 1px solid #fde68a; color: #b45309; }
 
-/* ── Tabs ── */
 .stTabs [data-baseweb="tab-list"] {
     background: #e8eaf0 !important; border-radius: 10px !important;
-    padding: 4px !important; gap: 2px !important; border: none !important;
-    margin-bottom: 1rem;
+    padding: 4px !important; gap: 2px !important; border: none !important; margin-bottom: 1rem;
 }
 .stTabs [data-baseweb="tab"] {
     border-radius: 8px !important; font-size: 0.78rem !important;
@@ -89,8 +75,6 @@ html, body, [class*="css"], .stApp {
     background: #fff !important; color: #111827 !important;
     box-shadow: 0 1px 4px rgba(0,0,0,0.08) !important;
 }
-
-/* ── Upload zone ── */
 .upload-zone {
     background: linear-gradient(135deg, #fafbff, #f0f4ff);
     border: 2.5px dashed #c7d2fe; border-radius: 16px;
@@ -105,8 +89,6 @@ html, body, [class*="css"], .stApp {
     padding: 0.22rem 0.6rem; border-radius: 6px; letter-spacing: 0.05em;
     text-transform: uppercase; border: 1px solid #bfdbfe;
 }
-
-/* ── Camera ── */
 .cam-hint {
     background: #f0f4ff; border: 1px solid #c7d2fe; border-radius: 10px;
     padding: 0.65rem 0.9rem; font-size: 0.73rem; color: #4338ca;
@@ -117,123 +99,60 @@ html, body, [class*="css"], .stApp {
     color: white !important; border: none !important;
     border-radius: 8px !important; font-weight: 600 !important; font-size: 0.8rem !important;
 }
-
-/* ── File uploader ── */
 [data-testid="stFileUploader"] {
     background: #f9fafb !important; border: 2px dashed #d1d5db !important;
     border-radius: 12px !important;
 }
-[data-testid="stFileUploader"]:hover { border-color: #6366f1 !important; }
-
-/* ── Divider ── */
 .hdiv { height: 1px; background: linear-gradient(90deg,transparent,#e2e8f0,transparent); margin: 1rem 0; }
-
-/* ── Detection label ── */
 .det-label {
     font-size: 0.64rem; font-weight: 700; letter-spacing: 0.12em;
     text-transform: uppercase; color: #6b7280; margin: 0.8rem 0 0.4rem;
 }
-
-/* ── Verdict card ── */
-.verdict-card {
-    border-radius: 14px; padding: 1.5rem 1.4rem 1.2rem;
-    text-align: center; margin-bottom: 1.2rem;
-}
+.verdict-card { border-radius: 14px; padding: 1.5rem 1.4rem 1.2rem; text-align: center; margin-bottom: 1.2rem; }
 .verdict-b3   { background: linear-gradient(135deg,#fff1f1,#ffe4e4); border: 2px solid #fca5a5; }
 .verdict-safe { background: linear-gradient(135deg,#f0fdf4,#dcfce7); border: 2px solid #86efac; }
 .v-emoji  { font-size: 2.6rem; display: block; margin-bottom: 0.4rem; }
 .v-label  { font-size: 2rem; font-weight: 900; letter-spacing: -0.04em; line-height: 1; }
 .v-label-b3   { color: #dc2626; }
 .v-label-safe { color: #16a34a; }
-.v-status {
-    font-size: 0.65rem; font-weight: 700; letter-spacing: 0.14em;
-    text-transform: uppercase; margin: 0.4rem 0 0.8rem;
-}
+.v-status { font-size: 0.65rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; margin: 0.4rem 0 0.8rem; }
 .v-status-b3   { color: #ef4444; }
 .v-status-safe { color: #22c55e; }
 .v-desc { font-size: 0.75rem; color: #374151; line-height: 1.65; }
-
-/* ── Pills ── */
 .pills { display: flex; gap: 0.7rem; margin-bottom: 1rem; }
-.pill {
-    flex: 1; background: #f8fafc; border: 1.5px solid #e2e8f0;
-    border-radius: 12px; padding: 0.8rem 0.6rem; text-align: center;
-}
+.pill { flex: 1; background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 12px; padding: 0.8rem 0.6rem; text-align: center; }
 .pill-val { font-size: 1.15rem; font-weight: 800; display: block; letter-spacing: -0.03em; color: #111827; }
-.pill-lbl {
-    font-size: 0.57rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
-    color: #6b7280; display: block; margin-top: 0.2rem;
-}
-
-/* ── YOLO object row ── */
-.obj-row {
-    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
-    padding: 0.5rem 0.8rem; margin-bottom: 0.35rem; font-size: 0.73rem;
-    display: flex; align-items: center; justify-content: space-between;
-    color: #111827;
-}
+.pill-lbl { font-size: 0.57rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #6b7280; display: block; margin-top: 0.2rem; }
+.obj-row { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.5rem 0.8rem; margin-bottom: 0.35rem; font-size: 0.73rem; display: flex; align-items: center; justify-content: space-between; }
 .obj-name { font-weight: 700; color: #111827; }
 .obj-conf { color: #6366f1; font-weight: 600; }
 .obj-size { color: #6b7280; font-size: 0.66rem; }
-
-/* ── Explanation box ── */
-.explain-box {
-    border-radius: 12px; padding: 1rem 1.1rem;
-    font-size: 0.75rem; line-height: 1.75; margin-top: 0.75rem; margin-bottom: 0.5rem;
-    color: #111827;
-}
+.explain-box { border-radius: 12px; padding: 1rem 1.1rem; font-size: 0.75rem; line-height: 1.75; margin-top: 0.75rem; margin-bottom: 0.5rem; }
 .explain-box-b3   { background: #fffbeb; border: 1.5px solid #fde68a; }
 .explain-box-safe { background: #f0fdf4; border: 1.5px solid #bbf7d0; }
-.explain-box b    { color: #111827; }
-.explain-title    { font-size: 0.82rem; font-weight: 800; color: #111827; margin-bottom: 0.6rem; display: block; }
-
-/* ── Tip card ── */
+.explain-title { font-size: 0.82rem; font-weight: 800; color: #111827; margin-bottom: 0.6rem; display: block; }
 .tip { border-radius: 12px; padding: 0.85rem 1rem; font-size: 0.73rem; line-height: 1.75; margin-top: 0.5rem; }
 .tip-b3   { background: #fffbeb; border: 1.5px solid #fde68a; color: #111827; }
 .tip-safe { background: #f0fdf4; border: 1.5px solid #bbf7d0; color: #111827; }
-.tip b    { color: #111827; }
-
-/* ── Empty state ── */
-.empty-state {
-    background: #fff; border: 2px dashed #e2e8f0; border-radius: 18px;
-    padding: 3.5rem 2rem; text-align: center;
-}
+.empty-state { background: #fff; border: 2px dashed #e2e8f0; border-radius: 18px; padding: 3.5rem 2rem; text-align: center; }
 .empty-icon  { font-size: 3rem; margin-bottom: 0.8rem; display: block; }
 .empty-title { font-size: 0.92rem; font-weight: 700; color: #6b7280; margin-bottom: 0.3rem; }
 .empty-sub   { font-size: 0.72rem; color: #9ca3af; line-height: 1.6; }
 
-/* ── History ── */
-.hist-head {
-    display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;
-}
+/* History */
+.hist-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; }
 .hist-head-title { font-size: 0.95rem; font-weight: 700; color: #111827; }
-.hist-count {
-    font-family: 'JetBrains Mono', monospace; font-size: 0.62rem; color: #6b7280;
-    background: #f1f5f9; border-radius: 20px; padding: 0.18rem 0.6rem;
-    border: 1px solid #e2e8f0;
-}
+.hist-count { font-family: 'JetBrains Mono', monospace; font-size: 0.62rem; color: #6b7280; background: #f1f5f9; border-radius: 20px; padding: 0.18rem 0.6rem; border: 1px solid #e2e8f0; }
 .stat-strip { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
-.stat-box {
-    flex: 1; background: #fff; border: 1.5px solid #e2e8f0;
-    border-radius: 11px; padding: 0.75rem 0.5rem; text-align: center;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
-}
+.stat-box { flex: 1; background: #fff; border: 1.5px solid #e2e8f0; border-radius: 11px; padding: 0.75rem 0.5rem; text-align: center; box-shadow: 0 1px 4px rgba(0,0,0,0.04); }
 .stat-v { font-size: 1.3rem; font-weight: 800; display: block; color: #111827; }
-.stat-l {
-    font-size: 0.55rem; font-weight: 700; letter-spacing: 0.09em;
-    text-transform: uppercase; color: #6b7280; display: block; margin-top: 0.1rem;
-}
-.hcard {
-    background: #fff; border: 1px solid #e2e8f0; border-radius: 12px;
-    padding: 0.8rem; margin-bottom: 0.6rem; display: flex; align-items: center; gap: 0.75rem;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
-}
+.stat-l { font-size: 0.55rem; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; color: #6b7280; display: block; margin-top: 0.1rem; }
+
+/* History card */
+.hcard { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 0.8rem; margin-bottom: 0.6rem; display: flex; align-items: center; gap: 0.75rem; box-shadow: 0 1px 4px rgba(0,0,0,0.04); }
 .hcard-b3   { border-left: 3px solid #ef4444; }
 .hcard-safe { border-left: 3px solid #22c55e; }
-.hcard-img  {
-    width: 54px; height: 54px; border-radius: 9px;
-    object-fit: cover; flex-shrink: 0; background: #f0f2f8;
-}
+.hcard-img  { width: 54px; height: 54px; border-radius: 9px; object-fit: cover; flex-shrink: 0; background: #f0f2f8; }
 .hcard-verdict     { font-size: 0.82rem; font-weight: 800; }
 .hcard-verdict-b3  { color: #dc2626; }
 .hcard-verdict-safe{ color: #16a34a; }
@@ -242,60 +161,174 @@ html, body, [class*="css"], .stApp {
 .hcard-conf-b3   { color: #ef4444; }
 .hcard-conf-safe { color: #22c55e; }
 .hcard-time { font-size: 0.6rem; color: #9ca3af; }
-.hcard-src  {
-    font-size: 0.57rem; background: #f1f5f9; color: #6b7280;
-    border-radius: 4px; padding: 0.1rem 0.35rem; border: 1px solid #e2e8f0;
-}
-.hist-empty {
-    text-align: center; padding: 2.5rem 1rem;
-    background: #fafbff; border: 1.5px dashed #e2e8f0; border-radius: 12px;
-}
+.hcard-src  { font-size: 0.57rem; background: #f1f5f9; color: #6b7280; border-radius: 4px; padding: 0.1rem 0.35rem; border: 1px solid #e2e8f0; }
+.hist-empty { text-align: center; padding: 2.5rem 1rem; background: #fafbff; border: 1.5px dashed #e2e8f0; border-radius: 12px; }
 .hist-empty-icon { font-size: 2rem; margin-bottom: 0.4rem; }
 .hist-empty-text { font-size: 0.78rem; color: #6b7280; line-height: 1.6; }
 
-/* ── Expander ── */
+/* Action row in history card */
+.hcard-actions { display: flex; gap: 0.4rem; flex-shrink: 0; flex-direction: column; }
+
 .streamlit-expanderHeader p { color: #111827 !important; font-weight: 600 !important; }
-details summary { color: #111827 !important; }
-
-/* ── Plotly: force light ── */
 .js-plotly-plot .plotly { background: transparent !important; }
-
-/* ── Streamlit image ── */
 [data-testid="stImage"] img { border-radius: 12px !important; }
-
-/* ── Download button ── */
-.stDownloadButton button {
-    border-radius: 9px !important; font-size: 0.8rem !important;
-    font-weight: 600 !important; color: #111827 !important;
-    background: #fff !important; border: 1.5px solid #e2e8f0 !important;
-}
-.stDownloadButton button:hover {
-    border-color: #6366f1 !important; color: #6366f1 !important;
-}
-
-/* ── Force all text to dark ── */
 p, span, div, li, label, h1, h2, h3, h4, h5, h6 { color: #111827; }
-.stMarkdown p  { color: #111827 !important; }
-.stCaption     { color: #6b7280 !important; }
-code           { background: #f1f5f9 !important; color: #4338ca !important; border-radius: 4px; }
+.stMarkdown p { color: #111827 !important; }
+.stCaption { color: #6b7280 !important; }
+code { background: #f1f5f9 !important; color: #4338ca !important; border-radius: 4px; }
+
+/* Download & delete buttons in history */
+.stDownloadButton button {
+    border-radius: 7px !important; font-size: 0.7rem !important;
+    font-weight: 600 !important; padding: 0.3rem 0.6rem !important;
+    min-height: unset !important; height: auto !important;
+    background: #f0fdf4 !important; color: #15803d !important;
+    border: 1px solid #bbf7d0 !important; width: 100% !important;
+}
+.stDownloadButton button:hover { background: #dcfce7 !important; }
 </style>
 """, unsafe_allow_html=True)
 
 
 # ══════════════════════════════════════════════════════════════
-# RIWAYAT — localStorage (per-device, persistent)
+# HELPER — Generate result card image untuk download
+# ══════════════════════════════════════════════════════════════
+def make_result_card(orig_img: Image.Image, overlaid_img: Image.Image,
+                     is_b3: bool, confidence: float, timestamp: str,
+                     yolo_boxes: list) -> bytes:
+    """
+    Buat gambar kartu hasil klasifikasi untuk didownload.
+    Layout: foto asli + overlay | panel info di kanan
+    """
+    CARD_W, CARD_H = 900, 420
+    IMG_W           = 480
+    PANEL_W         = CARD_W - IMG_W
+    BG_COLOR        = (255, 255, 255)
+    ACCENT          = (220, 38, 38) if is_b3 else (22, 163, 74)
+    ACCENT_LIGHT    = (255, 241, 240) if is_b3 else (240, 253, 244)
+    TEXT_DARK       = (17, 24, 39)
+    TEXT_MID        = (107, 114, 128)
+
+    card = Image.new("RGB", (CARD_W, CARD_H), BG_COLOR)
+    draw = ImageDraw.Draw(card)
+
+    # ── Gambar overlay di kiri ──
+    img_resized = overlaid_img.copy()
+    img_resized.thumbnail((IMG_W, CARD_H), Image.LANCZOS)
+    iw, ih = img_resized.size
+    # Crop / pad ke tepat IMG_W x CARD_H
+    bg_img = Image.new("RGB", (IMG_W, CARD_H), (240, 242, 248))
+    bg_img.paste(img_resized, ((IMG_W - iw)//2, (CARD_H - ih)//2))
+    card.paste(bg_img, (0, 0))
+
+    # ── Panel kanan ──
+    px = IMG_W + 1
+    draw.rectangle([px, 0, CARD_W, CARD_H], fill=BG_COLOR)
+
+    # Accent top bar
+    draw.rectangle([px, 0, CARD_W, 5], fill=ACCENT)
+
+    # Load fonts
+    def font(size):
+        for name in ["arialbd.ttf","arial.ttf","DejaVuSans-Bold.ttf","DejaVuSans.ttf"]:
+            try: return ImageFont.truetype(name, size)
+            except: pass
+        return ImageFont.load_default()
+
+    f_big   = font(32)
+    f_med   = font(16)
+    f_sm    = font(13)
+    f_xs    = font(11)
+
+    # App label
+    draw.text((px + 20, 20), "B3 Waste Detector", font=font(13), fill=TEXT_MID)
+
+    # Verdict icon + text
+    verdict_txt = "BERBAHAYA" if is_b3 else "AMAN"
+    icon_txt    = "☣" if is_b3 else "✓"
+    draw.rectangle([px+20, 50, CARD_W-20, 130], fill=ACCENT_LIGHT,
+                   outline=ACCENT, width=2)
+
+    draw.text((px + 30, 62), icon_txt, font=font(36), fill=ACCENT)
+    label = "B3" if is_b3 else "non-B3"
+    draw.text((px + 80, 62), label, font=font(34), fill=ACCENT)
+    draw.text((px + 80, 102), verdict_txt, font=font(14), fill=ACCENT)
+
+    # Confidence
+    conf_pct = f"{confidence:.1%}"
+    draw.text((px + 20, 148), "Keyakinan Model", font=f_xs, fill=TEXT_MID)
+    draw.text((px + 20, 164), conf_pct, font=font(28), fill=TEXT_DARK)
+
+    # Progress bar confidence
+    bar_x1, bar_y = px+20, 200
+    bar_w = PANEL_W - 40
+    draw.rectangle([bar_x1, bar_y, bar_x1+bar_w, bar_y+8],
+                   fill=(230, 232, 240), outline=None)
+    fill_w = int(bar_w * confidence)
+    if fill_w > 0:
+        draw.rectangle([bar_x1, bar_y, bar_x1+fill_w, bar_y+8], fill=ACCENT)
+
+    # Divider
+    draw.line([(px+20, 222), (CARD_W-20, 222)], fill=(230, 232, 240), width=1)
+
+    # YOLO objects
+    draw.text((px+20, 232), "Objek Terdeteksi", font=f_xs, fill=TEXT_MID)
+    if yolo_boxes:
+        obj_names = list(dict.fromkeys([b[5] for b in yolo_boxes if len(b)>5]))[:4]
+        for i, name in enumerate(obj_names):
+            draw.text((px+20, 250 + i*18), f"• {name}", font=f_sm, fill=TEXT_DARK)
+    else:
+        draw.text((px+20, 250), "—", font=f_sm, fill=TEXT_MID)
+
+    # Divider
+    draw.line([(px+20, 322), (CARD_W-20, 322)], fill=(230, 232, 240), width=1)
+
+    # Timestamp
+    draw.text((px+20, 332), timestamp, font=f_xs, fill=TEXT_MID)
+
+    # Watermark bottom right
+    wm = "AI Classification Result"
+    draw.text((CARD_W - 160, CARD_H - 22), wm, font=f_xs, fill=(200, 205, 215))
+
+    # Thin border around whole card
+    draw.rectangle([0, 0, CARD_W-1, CARD_H-1], outline=(220, 224, 235), width=1)
+
+    buf = io.BytesIO()
+    card.save(buf, format="PNG", dpi=(150, 150))
+    return buf.getvalue()
+
+
+# ══════════════════════════════════════════════════════════════
+# localStorage helpers
 # ══════════════════════════════════════════════════════════════
 def save_to_localstorage(entry_json: str):
-    escaped = entry_json.replace("\\", "\\\\").replace("`", "\\`").replace("$", "\\$")
+    escaped = entry_json.replace("\\","\\\\").replace("`","\\`").replace("$","\\$")
     components.html(f"""<script>
     (function(){{
-        const KEY='{STORAGE_KEY}';
+        const K='{STORAGE_KEY}';
         let h=[];
-        try{{h=JSON.parse(localStorage.getItem(KEY)||'[]');}}catch(e){{}}
+        try{{h=JSON.parse(localStorage.getItem(K)||'[]');}}catch(e){{}}
         h.unshift(JSON.parse(`{escaped}`));
         if(h.length>100)h=h.slice(0,100);
-        localStorage.setItem(KEY,JSON.stringify(h));
+        localStorage.setItem(K,JSON.stringify(h));
     }})();
+    </script>""", height=0)
+
+def delete_from_localstorage(entry_id: str):
+    """Inject JS untuk hapus satu entri dari localStorage."""
+    components.html(f"""<script>
+    (function(){{
+        const K='{STORAGE_KEY}';
+        let h=[];
+        try{{h=JSON.parse(localStorage.getItem(K)||'[]');}}catch(e){{}}
+        h=h.filter(x=>x.id!=='{entry_id}');
+        localStorage.setItem(K,JSON.stringify(h));
+    }})();
+    </script>""", height=0)
+
+def clear_localstorage():
+    components.html(f"""<script>
+    localStorage.removeItem('{STORAGE_KEY}');
     </script>""", height=0)
 
 def pil_to_thumb_b64(img: Image.Image, size: int = 110) -> str:
@@ -306,8 +339,8 @@ def pil_to_thumb_b64(img: Image.Image, size: int = 110) -> str:
     return base64.b64encode(buf.getvalue()).decode()
 
 def build_entry(img, is_b3, pred_proba, yolo_boxes, source):
-    conf = round((1 - pred_proba) if is_b3 else pred_proba, 4)
-    objs = [b[5] for b in yolo_boxes if len(b) > 5] if yolo_boxes else []
+    conf = round((1-pred_proba) if is_b3 else pred_proba, 4)
+    objs = [b[5] for b in yolo_boxes if len(b)>5] if yolo_boxes else []
     return {
         "id"        : datetime.now().strftime("%Y%m%d_%H%M%S_%f"),
         "timestamp" : datetime.now().strftime("%d %b %Y, %H:%M"),
@@ -319,10 +352,11 @@ def build_entry(img, is_b3, pred_proba, yolo_boxes, source):
         "thumb_b64" : pil_to_thumb_b64(img),
     }
 
-if "history" not in st.session_state:
-    st.session_state.history = []
-if "last_saved_id" not in st.session_state:
-    st.session_state.last_saved_id = None
+if "history"       not in st.session_state: st.session_state.history       = []
+if "overlaid_imgs" not in st.session_state: st.session_state.overlaid_imgs = {}
+if "orig_imgs"     not in st.session_state: st.session_state.orig_imgs     = {}
+if "last_saved_id" not in st.session_state: st.session_state.last_saved_id = None
+if "delete_id"     not in st.session_state: st.session_state.delete_id     = None
 
 
 # ══════════════════════════════════════════════════════════════
@@ -340,8 +374,7 @@ def load_classifier():
     class CIL(tf.keras.layers.InputLayer):
         def __init__(self, **kw):
             _s(kw)
-            if "batch_shape" in kw:
-                kw["input_shape"] = kw.pop("batch_shape")[1:]
+            if "batch_shape" in kw: kw["input_shape"] = kw.pop("batch_shape")[1:]
             super().__init__(**kw)
     class CD(tf.keras.layers.Dense):
         def __init__(self, **kw): super().__init__(**_s(kw))
@@ -350,9 +383,9 @@ def load_classifier():
     class CDC(tf.keras.layers.DepthwiseConv2D):
         def __init__(self, **kw): super().__init__(**_s(kw))
     return tf.keras.models.load_model(
-        os.path.join(BASE_DIR, "model_b3.h5"),
-        custom_objects={"BatchNormalization":CBN,"InputLayer":CIL,"Dense":CD,
-                        "Conv2D":CC,"DepthwiseConv2D":CDC},
+        os.path.join(BASE_DIR,"model_b3.h5"),
+        custom_objects={"BatchNormalization":CBN,"InputLayer":CIL,
+                        "Dense":CD,"Conv2D":CC,"DepthwiseConv2D":CDC},
         compile=False
     )
 
@@ -364,8 +397,7 @@ def load_yolo():
             p = os.path.join(BASE_DIR, fname)
             if os.path.exists(p): return YOLO(p)
         return None
-    except Exception:
-        return None
+    except Exception: return None
 
 def run_yolo(yolo_model, pil_img):
     if yolo_model is None: return []
@@ -380,11 +412,10 @@ def run_yolo(yolo_model, pil_img):
                               float(b.conf[0]),
                               yolo_model.names.get(int(b.cls[0]),"obj")))
         return boxes
-    except Exception:
-        return []
+    except Exception: return []
 
 def draw_overlay(pil_img, yolo_boxes, is_b3, pred_proba, yolo_ok):
-    W, H   = pil_img.size
+    W,H    = pil_img.size
     result = pil_img.copy()
     draw   = ImageDraw.Draw(result)
     color  = (220,38,38) if is_b3 else (22,163,74)
@@ -399,7 +430,7 @@ def draw_overlay(pil_img, yolo_boxes, is_b3, pred_proba, yolo_ok):
             draw.line([(cx,cy),(cx,cy+dy*cl)], fill=color, width=lw+2)
 
     def pill(x1,y1,label):
-        bb = draw.textbbox((0,0),label,font=font)
+        bb=draw.textbbox((0,0),label,font=font)
         tw=bb[2]-bb[0]; th=bb[3]-bb[1]; ph=max(24,H//22)
         py=max(0,y1-ph-4)
         draw.rectangle([x1,py,x1+tw+16,py+ph], fill=color)
@@ -413,13 +444,12 @@ def draw_overlay(pil_img, yolo_boxes, is_b3, pred_proba, yolo_ok):
             pill(x1,y1,verdict)
         return result, "yolo"
 
-    # Fallback saliency
-    gray = np.array(pil_img.convert("L"), dtype=np.float32)
-    rows,cols = 7,7; ph2,pw2 = H//rows, W//cols
-    heat = np.array([[np.var(gray[r*ph2:(r+1)*ph2,c*pw2:(c+1)*pw2])
-                      for c in range(cols)] for r in range(rows)])
+    gray=np.array(pil_img.convert("L"),dtype=np.float32)
+    rows,cols=7,7; ph2,pw2=H//rows,W//cols
+    heat=np.array([[np.var(gray[r*ph2:(r+1)*ph2,c*pw2:(c+1)*pw2])
+                    for c in range(cols)] for r in range(rows)])
     if heat.max()>0: heat/=heat.max()
-    mask = heat>0.4
+    mask=heat>0.4
     if not mask.any(): mask=heat==heat.max()
     yr,xc=np.where(mask)
     x1=max(0,xc.min()*pw2-10); y1=max(0,yr.min()*ph2-10)
@@ -431,27 +461,27 @@ def draw_overlay(pil_img, yolo_boxes, is_b3, pred_proba, yolo_ok):
 
 
 # ══════════════════════════════════════════════════════════════
-# KONTEN PENJELASAN
+# PENJELASAN B3 / non-B3
 # ══════════════════════════════════════════════════════════════
 B3_ITEMS = [
-    ("🔋", "Baterai", "Batu baterai, baterai HP, baterai laptop"),
-    ("🧴", "Pembersih kimia keras", "Cairan pel, pembersih toilet, pemutih pakaian"),
-    ("🧼", "Deterjen berbahan kimia kuat", "Sabun cuci tertentu dengan label peringatan"),
-    ("💊", "Obat-obatan kadaluarsa", "Obat, suplemen, sirup yang sudah expired"),
-    ("🛢️", "Oli & cairan mesin", "Oli mesin bekas, bensin, solar, cairan rem"),
-    ("🖨️", "Elektronik rusak", "HP, printer, kabel, lampu neon, baterai lithium"),
-    ("🎨", "Cat, pylox & thinner", "Cat tembok, pilox, lem tembak, cairan pelarut"),
-    ("🌿", "Pestisida & insektisida", "Obat nyamuk semprot, pembasmi hama, pupuk kimia"),
+    ("🔋","Baterai","Batu baterai, baterai HP, baterai laptop"),
+    ("🧴","Pembersih kimia keras","Cairan pel, pembersih toilet, pemutih pakaian"),
+    ("🧼","Deterjen berbahan kimia kuat","Sabun cuci tertentu dengan label peringatan"),
+    ("💊","Obat-obatan kadaluarsa","Obat, suplemen, sirup yang sudah expired"),
+    ("🛢️","Oli & cairan mesin","Oli mesin bekas, bensin, solar, cairan rem"),
+    ("🖨️","Elektronik rusak","HP, printer, kabel, lampu neon, baterai lithium"),
+    ("🎨","Cat, pylox & thinner","Cat tembok, pilox, lem tembak, cairan pelarut"),
+    ("🌿","Pestisida & insektisida","Obat nyamuk semprot, pembasmi hama, pupuk kimia"),
 ]
 NON_B3_ITEMS = [
-    ("📄", "Kertas & kardus", "Koran, majalah, dus bekas, kotak makanan"),
-    ("🧴", "Plastik biasa", "Botol air, kantong belanja, bungkus makanan"),
-    ("🥫", "Kaleng & logam biasa", "Kaleng susu kosong, besi tua, aluminium"),
-    ("👕", "Pakaian & kain", "Baju bekas, handuk lama, kain perca"),
-    ("🥬", "Sisa makanan & organik", "Kulit buah, sayuran, nasi basi, tulang ayam"),
-    ("👟", "Sepatu & tas", "Sepatu bekas, tas rusak, sandal"),
-    ("📦", "Gabus & styrofoam", "Gabus bekas elektronik, wadah mie instan"),
-    ("🌾", "Sampah dapur lainnya", "Ampas kopi, teh celup, cangkang telur"),
+    ("📄","Kertas & kardus","Koran, majalah, dus bekas, kotak makanan"),
+    ("🧴","Plastik biasa","Botol air, kantong belanja, bungkus makanan"),
+    ("🥫","Kaleng & logam biasa","Kaleng susu kosong, besi tua, aluminium"),
+    ("👕","Pakaian & kain","Baju bekas, handuk lama, kain perca"),
+    ("🥬","Sisa makanan & organik","Kulit buah, sayuran, nasi basi, tulang ayam"),
+    ("👟","Sepatu & tas","Sepatu bekas, tas rusak, sandal"),
+    ("📦","Gabus & styrofoam","Gabus bekas elektronik, wadah mie instan"),
+    ("🌾","Sampah dapur lainnya","Ampas kopi, teh celup, cangkang telur"),
 ]
 
 def render_b3_explanation():
@@ -463,7 +493,7 @@ def render_b3_explanation():
     </div>
     """, unsafe_allow_html=True)
     with st.expander("📋 Contoh jenis sampah B3 lainnya"):
-        for emoji, nama, contoh in B3_ITEMS:
+        for emoji,nama,contoh in B3_ITEMS:
             st.markdown(f"**{emoji} {nama}** — {contoh}")
     st.markdown("""
     <div class="tip tip-b3">
@@ -472,8 +502,7 @@ def render_b3_explanation():
         • Bawa ke <b>bank sampah B3</b> atau <b>drop box limbah B3</b> terdekat<br>
         • Bisa dititipkan ke toko elektronik, bengkel, atau apotek resmi<br>
         • <b>Jangan dibakar</b> — asapnya sangat berbahaya bagi pernapasan
-    </div>
-    """, unsafe_allow_html=True)
+    </div>""", unsafe_allow_html=True)
 
 def render_safe_explanation():
     st.markdown("""
@@ -481,10 +510,9 @@ def render_safe_explanation():
         <span class="explain-title">✅ Sampah Non-B3 — Aman Didaur Ulang!</span>
         Sampah ini <b>tidak berbahaya</b> dan bisa dibuang ke tempat sampah biasa.
         Lebih baik lagi jika <b>dipilah dan didaur ulang</b> agar bermanfaat kembali.
-    </div>
-    """, unsafe_allow_html=True)
+    </div>""", unsafe_allow_html=True)
     with st.expander("♻️ Contoh sampah non-B3 yang bisa didaur ulang"):
-        for emoji, nama, contoh in NON_B3_ITEMS:
+        for emoji,nama,contoh in NON_B3_ITEMS:
             st.markdown(f"**{emoji} {nama}** — {contoh}")
     st.markdown("""
     <div class="tip tip-safe">
@@ -493,8 +521,7 @@ def render_safe_explanation():
         • Cuci wadah plastik atau kaca sebelum dibuang ke tempat daur ulang<br>
         • Manfaatkan <b>bank sampah</b> di sekitar rumah atau kelurahan<br>
         • Sampah organik bisa dijadikan <b>kompos</b> untuk menyuburkan tanaman
-    </div>
-    """, unsafe_allow_html=True)
+    </div>""", unsafe_allow_html=True)
 
 
 # ══════════════════════════════════════════════════════════════
@@ -511,6 +538,15 @@ with st.spinner("⚙️ Memuat YOLOv8..."):
 
 THRESHOLD = 0.50
 
+# Handle delete action (diproses sebelum render)
+if st.session_state.delete_id:
+    del_id = st.session_state.delete_id
+    st.session_state.history = [h for h in st.session_state.history
+                                  if h["id"] != del_id]
+    st.session_state.overlaid_imgs.pop(del_id, None)
+    st.session_state.orig_imgs.pop(del_id, None)
+    delete_from_localstorage(del_id)
+    st.session_state.delete_id = None
 
 # ══════════════════════════════════════════════════════════════
 # TOPBAR
@@ -536,23 +572,22 @@ else:
     st.markdown('<div class="status-bar status-warn">⚠️ &nbsp;YOLOv8 tidak tersedia — install: <code>pip install ultralytics</code></div>',
                 unsafe_allow_html=True)
 
-# Info B3 expander
 with st.expander("ℹ️ Apa itu Sampah B3? Pelajari lebih lanjut"):
     col_a, col_b = st.columns(2)
     with col_a:
         st.markdown("**🔴 Sampah B3 (Berbahaya & Beracun)**")
-        st.markdown("Sampah yang mengandung bahan kimia berbahaya. Tidak boleh dibuang sembarangan.")
-        for emoji, nama, _ in B3_ITEMS[:4]:
+        st.markdown("Mengandung bahan kimia berbahaya. Tidak boleh dibuang sembarangan.")
+        for emoji,nama,_ in B3_ITEMS[:4]:
             st.markdown(f"{emoji} {nama}")
     with col_b:
         st.markdown("**🟢 Sampah Non-B3 (Aman)**")
         st.markdown("Sampah umum yang tidak berbahaya dan bisa didaur ulang.")
-        for emoji, nama, _ in NON_B3_ITEMS[:4]:
+        for emoji,nama,_ in NON_B3_ITEMS[:4]:
             st.markdown(f"{emoji} {nama}")
 
 
 # ══════════════════════════════════════════════════════════════
-# MAIN TABS
+# TABS
 # ══════════════════════════════════════════════════════════════
 tab_detect, tab_history = st.tabs(["🔍  Deteksi Sampah", "🕘  Riwayat Klasifikasi"])
 
@@ -561,11 +596,11 @@ tab_detect, tab_history = st.tabs(["🔍  Deteksi Sampah", "🕘  Riwayat Klasif
 # TAB 1 — DETEKSI
 # ════════════════════════════════
 with tab_detect:
-    pred_proba = None; is_b3 = None; img_source = None; input_source = "upload"
+    pred_proba=None; is_b3=None; img_source=None; input_source="upload"
     col_left, col_right = st.columns([1.1, 0.9], gap="large")
 
     with col_left:
-        tab_upload, tab_camera = st.tabs(["📁  Upload Gambar", "📷  Kamera Langsung"])
+        tab_upload, tab_camera = st.tabs(["📁  Upload Gambar","📷  Kamera Langsung"])
 
         with tab_upload:
             st.markdown("""
@@ -579,8 +614,7 @@ with tab_detect:
                     <span class="fmt-badge">WEBP</span>
                     <span class="fmt-badge">≤ 200MB</span>
                 </div>
-            </div>
-            """, unsafe_allow_html=True)
+            </div>""", unsafe_allow_html=True)
             uploaded = st.file_uploader("upload", type=["jpg","jpeg","png","webp"],
                                          label_visibility="collapsed")
             if uploaded:
@@ -598,11 +632,10 @@ with tab_detect:
         if img_source is not None:
             st.markdown('<div class="hdiv"></div>', unsafe_allow_html=True)
 
-            # Inference
             img_224    = img_source.resize((224,224))
             arr        = np.expand_dims(preprocess_input(
-                             np.array(img_224, dtype=np.float32)), axis=0)
-            pred_proba = float(model.predict(arr, verbose=0)[0][0])
+                             np.array(img_224,dtype=np.float32)), axis=0)
+            pred_proba = float(model.predict(arr,verbose=0)[0][0])
             is_b3      = pred_proba < THRESHOLD
 
             with st.spinner("🔍 Mendeteksi objek..."):
@@ -615,19 +648,37 @@ with tab_detect:
 
             warna = "red" if is_b3 else "green"
             label_txt = "B3 — BERBAHAYA" if is_b3 else "non-B3 — AMAN"
-            if mode == "yolo":
+            if mode=="yolo":
                 st.caption(f"YOLOv8 mendeteksi **{len(yolo_boxes)} objek**. "
-                           f"Klasifikasi MobileNetV2: **:{warna}[{label_txt}]**")
+                           f"Klasifikasi: **:{warna}[{label_txt}]**")
             else:
-                st.caption(f"Lokalisasi dari saliency map. "
-                           f"Klasifikasi MobileNetV2: **:{warna}[{label_txt}]**")
+                st.caption(f"Klasifikasi MobileNetV2: **:{warna}[{label_txt}]**")
+
+            # ── Download result card gambar ────────────────────────
+            conf_val = round((1-pred_proba) if is_b3 else pred_proba, 4)
+            ts_now   = datetime.now().strftime("%d %b %Y, %H:%M")
+            card_img = make_result_card(img_source, overlaid, is_b3,
+                                         conf_val, ts_now, yolo_boxes)
+            fname = f"hasil_{'B3' if is_b3 else 'nonB3'}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+            st.download_button(
+                label="⬇️ Download Hasil Klasifikasi (PNG)",
+                data=card_img,
+                file_name=fname,
+                mime="image/png",
+                use_container_width=True,
+            )
 
             # Simpan riwayat
             entry = build_entry(img_source, is_b3, pred_proba, yolo_boxes, input_source)
             if st.session_state.last_saved_id != entry["id"]:
                 st.session_state.history.insert(0, entry)
+                st.session_state.overlaid_imgs[entry["id"]] = overlaid
+                st.session_state.orig_imgs[entry["id"]]     = img_source
                 if len(st.session_state.history) > 100:
+                    oldest_id = st.session_state.history[-1]["id"]
                     st.session_state.history = st.session_state.history[:100]
+                    st.session_state.overlaid_imgs.pop(oldest_id, None)
+                    st.session_state.orig_imgs.pop(oldest_id, None)
                 st.session_state.last_saved_id = entry["id"]
                 save_to_localstorage(json.dumps(entry, ensure_ascii=False))
 
@@ -637,15 +688,14 @@ with tab_detect:
             <div class="empty-state">
                 <span class="empty-icon">🔬</span>
                 <div class="empty-title">Belum ada gambar</div>
-                <div class="empty-sub">Upload foto atau gunakan kamera<br>untuk memulai deteksi sampah B3</div>
+                <div class="empty-sub">Upload foto atau gunakan kamera<br>untuk memulai deteksi</div>
             </div>""", unsafe_allow_html=True)
         else:
-            conf_b3   = 1.0 - pred_proba
-            conf_safe = pred_proba
-            display_conf = conf_b3 if is_b3 else conf_safe
-            color_main   = "#dc2626" if is_b3 else "#16a34a"
+            import plotly.graph_objects as go
+            conf_b3   = 1.0-pred_proba; conf_safe = pred_proba
+            disp_conf = conf_b3 if is_b3 else conf_safe
+            color_main= "#dc2626" if is_b3 else "#16a34a"
 
-            # Verdict card
             if is_b3:
                 st.markdown("""
                 <div class="verdict-card verdict-b3">
@@ -665,11 +715,10 @@ with tab_detect:
                     Dapat diproses melalui daur ulang biasa.</div>
                 </div>""", unsafe_allow_html=True)
 
-            # Pills
             st.markdown(f"""
             <div class="pills">
                 <div class="pill">
-                    <span class="pill-val" style="color:{color_main}">{display_conf:.1%}</span>
+                    <span class="pill-val" style="color:{color_main}">{disp_conf:.1%}</span>
                     <span class="pill-lbl">{'Conf. B3' if is_b3 else 'Conf. Aman'}</span>
                 </div>
                 <div class="pill">
@@ -682,70 +731,49 @@ with tab_detect:
                 </div>
             </div>""", unsafe_allow_html=True)
 
-            # Gauge
-            import plotly.graph_objects as go
-            gauge_val   = conf_b3 * 100
-            gauge_color = "#ef4444" if is_b3 else "#22c55e"
-            fig_g = go.Figure(go.Indicator(
+            gauge_val=conf_b3*100; gauge_color="#ef4444" if is_b3 else "#22c55e"
+            fig_g=go.Figure(go.Indicator(
                 mode="gauge+number", value=gauge_val,
-                number={"suffix":"%","font":{"size":26,"color":gauge_color,
-                                             "family":"Plus Jakarta Sans"}},
-                gauge={
-                    "axis":{"range":[0,100],"showticklabels":False,"tickwidth":0},
-                    "bar":{"color":gauge_color,"thickness":0.26},
-                    "bgcolor":"#f1f5f9","borderwidth":0,
-                    "steps":[{"range":[0,40],"color":"#dcfce7"},
-                              {"range":[40,60],"color":"#fef9c3"},
-                              {"range":[60,100],"color":"#fee2e2"}],
-                    "threshold":{"line":{"color":gauge_color,"width":3},
-                                 "thickness":0.85,"value":gauge_val}
-                },
-                title={"text":"Risiko B3","font":{"size":11,"color":"#6b7280",
-                                                   "family":"Plus Jakarta Sans"}},
+                number={"suffix":"%","font":{"size":26,"color":gauge_color,"family":"Plus Jakarta Sans"}},
+                gauge={"axis":{"range":[0,100],"showticklabels":False,"tickwidth":0},
+                       "bar":{"color":gauge_color,"thickness":0.26},"bgcolor":"#f1f5f9","borderwidth":0,
+                       "steps":[{"range":[0,40],"color":"#dcfce7"},{"range":[40,60],"color":"#fef9c3"},
+                                 {"range":[60,100],"color":"#fee2e2"}],
+                       "threshold":{"line":{"color":gauge_color,"width":3},"thickness":0.85,"value":gauge_val}},
+                title={"text":"Risiko B3","font":{"size":11,"color":"#6b7280","family":"Plus Jakarta Sans"}},
                 domain={"x":[0,1],"y":[0,1]}
             ))
-            fig_g.update_layout(height=190, margin=dict(t=36,b=8,l=16,r=16),
-                                paper_bgcolor="white", plot_bgcolor="white",
-                                font_color="#111827")
-            st.plotly_chart(fig_g, use_container_width=True, config={"displayModeBar":False})
+            fig_g.update_layout(height=190,margin=dict(t=36,b=8,l=16,r=16),
+                                paper_bgcolor="white",plot_bgcolor="white",font_color="#111827")
+            st.plotly_chart(fig_g,use_container_width=True,config={"displayModeBar":False})
 
-            # Bar chart
-            fig_b = go.Figure()
-            fig_b.add_trace(go.Bar(
-                x=[conf_b3*100], y=["B3"], orientation="h",
-                marker_color="#ef4444", marker_line_width=0, width=0.42,
-                text=[f"{conf_b3:.1%}"], textposition="inside",
-                insidetextfont=dict(color="white", size=11)))
-            fig_b.add_trace(go.Bar(
-                x=[conf_safe*100], y=["non-B3"], orientation="h",
-                marker_color="#22c55e", marker_line_width=0, width=0.42,
-                text=[f"{conf_safe:.1%}"], textposition="inside",
-                insidetextfont=dict(color="white", size=11)))
-            fig_b.update_layout(
-                height=108, margin=dict(t=4,b=4,l=58,r=14),
-                paper_bgcolor="white", plot_bgcolor="white", showlegend=False,
+            fig_b=go.Figure()
+            fig_b.add_trace(go.Bar(x=[conf_b3*100],y=["B3"],orientation="h",
+                marker_color="#ef4444",marker_line_width=0,width=0.42,
+                text=[f"{conf_b3:.1%}"],textposition="inside",
+                insidetextfont=dict(color="white",size=11)))
+            fig_b.add_trace(go.Bar(x=[conf_safe*100],y=["non-B3"],orientation="h",
+                marker_color="#22c55e",marker_line_width=0,width=0.42,
+                text=[f"{conf_safe:.1%}"],textposition="inside",
+                insidetextfont=dict(color="white",size=11)))
+            fig_b.update_layout(height=108,margin=dict(t=4,b=4,l=58,r=14),
+                paper_bgcolor="white",plot_bgcolor="white",showlegend=False,
                 xaxis=dict(range=[0,100],showticklabels=False,showgrid=False,zeroline=False),
                 yaxis=dict(showgrid=False,tickfont=dict(size=11,color="#374151")),
-                bargap=0.3, font_color="#111827")
-            st.plotly_chart(fig_b, use_container_width=True, config={"displayModeBar":False})
+                bargap=0.3,font_color="#111827")
+            st.plotly_chart(fig_b,use_container_width=True,config={"displayModeBar":False})
 
-            # YOLO objects
             if yolo_ok and yolo_boxes:
-                st.markdown('<div class="det-label">📦 Objek Terdeteksi YOLO</div>',
-                            unsafe_allow_html=True)
+                st.markdown('<div class="det-label">📦 Objek Terdeteksi YOLO</div>',unsafe_allow_html=True)
                 for i,(x1,y1,x2,y2,conf,name) in enumerate(yolo_boxes):
-                    st.markdown(f"""
-                    <div class="obj-row">
+                    st.markdown(f"""<div class="obj-row">
                         <span class="obj-name">#{i+1} &nbsp;{name}</span>
                         <span class="obj-conf">{conf:.0%}</span>
                         <span class="obj-size">{x2-x1}×{y2-y1}px</span>
                     </div>""", unsafe_allow_html=True)
 
-            # Penjelasan
-            if is_b3:
-                render_b3_explanation()
-            else:
-                render_safe_explanation()
+            if is_b3: render_b3_explanation()
+            else:     render_safe_explanation()
 
 
 # ════════════════════════════════
@@ -757,17 +785,28 @@ with tab_history:
     n_b3    = sum(1 for h in history if h["is_b3"])
     n_safe  = n_total - n_b3
 
-    st.markdown(f"""
-    <div class="hist-head">
-        <span class="hist-head-title">📋 Riwayat Klasifikasi</span>
-        <span class="hist-count">{n_total} entri sesi ini</span>
-    </div>""", unsafe_allow_html=True)
+    # ── Header + hapus semua ──────────────────────────────────
+    hcol1, hcol2 = st.columns([2, 1])
+    with hcol1:
+        st.markdown(f"""
+        <div class="hist-head">
+            <span class="hist-head-title">📋 Riwayat Klasifikasi</span>
+            <span class="hist-count">{n_total} entri sesi ini</span>
+        </div>""", unsafe_allow_html=True)
+    with hcol2:
+        if n_total > 0:
+            if st.button("🗑️ Hapus Semua Sesi", use_container_width=True, type="secondary"):
+                st.session_state.history       = []
+                st.session_state.overlaid_imgs = {}
+                st.session_state.orig_imgs     = {}
+                st.session_state.last_saved_id = None
+                clear_localstorage()
+                st.rerun()
 
-    # Info localStorage
     st.info("💾 **Riwayat tersimpan di browser kamu** — tetap ada meski halaman di-refresh, "
             "tapi tidak terlihat di perangkat lain.", icon="ℹ️")
 
-    # Riwayat dari localStorage (rendered oleh JS)
+    # ── localStorage viewer (JS) ──────────────────────────────
     components.html(f"""
     <div id="ls-root" style="font-family:'Plus Jakarta Sans',sans-serif;"></div>
     <script>
@@ -803,49 +842,42 @@ with tab_history:
                 const ico=e.is_b3?'☣️':'✅';
                 const vrd=e.is_b3?'B3 — BERBAHAYA':'non-B3 — AMAN';
                 const pct=((e.confidence||0)*100).toFixed(1);
-                const src=e.source==='kamera'?'📷 Kamera':'📁 Upload';
+                const src=e.source==='kamera'?'📷':'📁';
                 const img=e.thumb_b64
                     ?`<img src="data:image/jpeg;base64,${{e.thumb_b64}}"
-                           style="width:52px;height:52px;border-radius:9px;
-                                  object-fit:cover;flex-shrink:0"/>`
-                    :`<div style="width:52px;height:52px;border-radius:9px;
-                                  background:#f0f2f8;flex-shrink:0"></div>`;
+                           style="width:48px;height:48px;border-radius:8px;object-fit:cover;flex-shrink:0"/>`
+                    :`<div style="width:48px;height:48px;border-radius:8px;background:#f0f2f8;flex-shrink:0"></div>`;
                 return `
                 <div style="background:#fff;border:1px solid #e2e8f0;border-left:3px solid ${{bdr}};
-                             border-radius:12px;padding:0.75rem;margin-bottom:0.5rem;
-                             display:flex;align-items:center;gap:0.75rem">
+                             border-radius:11px;padding:0.65rem;margin-bottom:0.45rem;
+                             display:flex;align-items:center;gap:0.65rem">
                     ${{img}}
                     <div style="flex:1;min-width:0">
-                        <div style="font-size:0.82rem;font-weight:800;color:${{col}}">${{ico}} ${{vrd}}</div>
-                        <div style="display:flex;flex-wrap:wrap;gap:0.35rem;
-                                    align-items:center;margin-top:0.25rem">
-                            <span style="font-family:monospace;font-size:0.65rem;
-                                         font-weight:600;color:${{col}}">${{pct}}%</span>
+                        <div style="font-size:0.8rem;font-weight:800;color:${{col}}">${{ico}} ${{vrd}}</div>
+                        <div style="display:flex;gap:0.35rem;align-items:center;margin-top:0.2rem;flex-wrap:wrap">
+                            <span style="font-size:0.65rem;font-weight:600;color:${{col}};font-family:monospace">${{pct}}%</span>
                             <span style="font-size:0.6rem;background:#f1f5f9;color:#6b7280;
-                                         border-radius:4px;padding:0.1rem 0.35rem;
-                                         border:1px solid #e2e8f0">${{src}}</span>
+                                         border-radius:4px;padding:0.1rem 0.3rem;border:1px solid #e2e8f0">${{src}} ${{e.source||''}}</span>
                             <span style="font-size:0.6rem;color:#9ca3af">${{e.timestamp||''}}</span>
                         </div>
                     </div>
                 </div>`;}}).join('')}}
-            ${{h.length>30?`<p style="text-align:center;font-size:0.72rem;color:#6b7280;
-                margin:0.5rem 0">... dan ${{h.length-30}} entri lainnya</p>`:''}}`+
-            `<button onclick="if(confirm('Hapus semua riwayat di perangkat ini?')){{
-                localStorage.removeItem('${STORAGE_KEY}');location.reload();}}"
+            ${{h.length>30?`<p style="text-align:center;font-size:0.72rem;color:#6b7280;margin:0.5rem 0">... dan ${{h.length-30}} entri lainnya</p>`:''}}
+            <button onclick="if(confirm('Hapus semua riwayat di perangkat ini?')){{localStorage.removeItem('{STORAGE_KEY}');location.reload();}}"
                 style="width:100%;margin-top:0.75rem;padding:0.6rem;border-radius:9px;
                        border:1.5px solid #e2e8f0;background:#f8fafc;color:#374151;
-                       font-family:'Plus Jakarta Sans',sans-serif;
-                       font-size:0.78rem;font-weight:600;cursor:pointer">
-                🗑️ Hapus Riwayat Perangkat Ini
+                       font-family:'Plus Jakarta Sans',sans-serif;font-size:0.78rem;
+                       font-weight:600;cursor:pointer">
+                🗑️ Hapus Semua Riwayat di Perangkat Ini
             </button>
         </div>`;
     }})();
     </script>
-    """, height=650, scrolling=True)
+    """, height=620, scrolling=True)
 
     st.markdown('<div class="hdiv"></div>', unsafe_allow_html=True)
 
-    # Statistik sesi + export
+    # ── Sesi sekarang ──────────────────────────────────────────
     if n_total > 0:
         st.markdown(f"""
         <p style="font-size:0.64rem;font-weight:700;letter-spacing:0.12em;
@@ -866,20 +898,10 @@ with tab_history:
             </div>
         </div>""", unsafe_allow_html=True)
 
-        export_data = [{k:v for k,v in h.items() if k != "thumb_b64"}
-                       for h in history]
-        st.download_button(
-            label="⬇️ Export Riwayat Sesi (.json)",
-            data=json.dumps(export_data, ensure_ascii=False, indent=2),
-            file_name=f"riwayat_b3_{datetime.now().strftime('%Y%m%d_%H%M')}.json",
-            mime="application/json",
-            use_container_width=True
-        )
-
-        # Kartu sesi
-        st.markdown('<div class="hdiv"></div>', unsafe_allow_html=True)
+        # ── Kartu riwayat sesi + download per-item + hapus per-item ──
         for entry in history:
             b3     = entry["is_b3"]
+            eid    = entry["id"]
             card_c = "hcard-b3" if b3 else "hcard-safe"
             v_c    = "hcard-verdict-b3" if b3 else "hcard-verdict-safe"
             c_c    = "hcard-conf-b3" if b3 else "hcard-conf-safe"
@@ -889,6 +911,8 @@ with tab_history:
             thumb  = entry.get("thumb_b64","")
             t_html = (f'<img class="hcard-img" src="data:image/jpeg;base64,{thumb}"/>'
                       if thumb else '<div class="hcard-img"></div>')
+
+            # Render kartu HTML (tanpa tombol — Streamlit handle tombol)
             st.markdown(f"""
             <div class="hcard {card_c}">
                 {t_html}
@@ -901,6 +925,54 @@ with tab_history:
                     </div>
                 </div>
             </div>""", unsafe_allow_html=True)
+
+            # Tombol download + hapus per item
+            btn_a, btn_b = st.columns(2)
+            with btn_a:
+                # Buat result card image dari data tersimpan
+                overlaid_img = st.session_state.overlaid_imgs.get(eid)
+                orig_img     = st.session_state.orig_imgs.get(eid)
+
+                if overlaid_img is not None and orig_img is not None:
+                    card_bytes = make_result_card(
+                        orig_img, overlaid_img, b3,
+                        entry["confidence"], entry.get("timestamp",""),
+                        [(0,0,0,0,0,o) for o in entry.get("objects",[])]
+                    )
+                    dl_fname = (f"hasil_{'B3' if b3 else 'nonB3'}_"
+                                f"{entry.get('timestamp','').replace(' ','_').replace(',','')}.png")
+                    st.download_button(
+                        label="⬇️ Download Gambar",
+                        data=card_bytes,
+                        file_name=dl_fname,
+                        mime="image/png",
+                        key=f"dl_{eid}",
+                        use_container_width=True,
+                    )
+                else:
+                    # Gambar sudah tidak ada di memory, buat dari thumbnail
+                    if thumb:
+                        img_data = base64.b64decode(thumb)
+                        thumb_img = Image.open(io.BytesIO(img_data)).convert("RGB")
+                        card_bytes = make_result_card(
+                            thumb_img, thumb_img, b3,
+                            entry["confidence"], entry.get("timestamp",""),
+                            [(0,0,0,0,0,o) for o in entry.get("objects",[])]
+                        )
+                        st.download_button(
+                            label="⬇️ Download Gambar",
+                            data=card_bytes,
+                            file_name=f"hasil_{eid}.png",
+                            mime="image/png",
+                            key=f"dl_{eid}",
+                            use_container_width=True,
+                        )
+
+            with btn_b:
+                if st.button("🗑️ Hapus", key=f"del_{eid}", use_container_width=True):
+                    st.session_state.delete_id = eid
+                    st.rerun()
+
     else:
         st.markdown("""
         <div class="hist-empty">
