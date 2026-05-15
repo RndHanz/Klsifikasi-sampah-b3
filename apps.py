@@ -383,7 +383,7 @@ def load_classifier():
     class CDC(tf.keras.layers.DepthwiseConv2D):
         def __init__(self, **kw): super().__init__(**_s(kw))
     return tf.keras.models.load_model(
-        os.path.join(BASE_DIR,"model_b3.h5"),
+        os.path.join(BASE_DIR,"model_b3_final.h5"),
         custom_objects={"BatchNormalization":CBN,"InputLayer":CIL,
                         "Dense":CD,"Conv2D":CC,"DepthwiseConv2D":CDC},
         compile=False
