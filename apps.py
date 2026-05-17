@@ -1089,53 +1089,48 @@ with tab_history:
 
 components.html("""
 <script>
-function hideStreamlitBranding() {
 
-    // Semua kemungkinan selector Streamlit
+function nukeBranding() {
+
+    // Remove known elements
     const selectors = [
-        '#MainMenu',
-        'header',
-        'footer',
-        '[data-testid="stToolbar"]',
         '[data-testid="stDecoration"]',
-        '[data-testid="stStatusWidget"]',
-        '.stDeployButton',
         '.stAppDeployButton',
+        '.stDeployButton',
         '[class*="viewerBadge"]',
-        '[href*="streamlit.io"]',
-        '[href*="github.com"]'
+        'iframe'
     ];
 
     selectors.forEach(selector => {
         document.querySelectorAll(selector).forEach(el => {
-            el.style.display = 'none';
-            el.style.visibility = 'hidden';
-            el.style.opacity = '0';
             el.remove();
         });
     });
 
-    // Hapus fixed floating element pojok
-    document.querySelectorAll('div').forEach(el => {
+    // Remove floating bottom elements
+    document.querySelectorAll('*').forEach(el => {
+
         const style = window.getComputedStyle(el);
 
-        if (
-            style.position === 'fixed' &&
-            (
-                el.innerText.includes('Streamlit') ||
-                el.innerHTML.includes('streamlit') ||
-                el.innerHTML.includes('github')
-            )
-        ) {
+        const rect = el.getBoundingClientRect();
+
+        const isFloating =
+            style.position === 'fixed' ||
+            style.position === 'sticky';
+
+        const isBottom =
+            rect.bottom > window.innerHeight - 120;
+
+        if (isFloating && isBottom) {
             el.remove();
         }
     });
 }
 
-// Jalankan berkali-kali
-hideStreamlitBranding();
+// Run repeatedly
+setInterval(nukeBranding, 500);
 
-setInterval(hideStreamlitBranding, 1000);
+window.onload = nukeBranding;
 
 </script>
 """, height=0)
