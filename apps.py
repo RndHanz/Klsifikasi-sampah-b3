@@ -26,7 +26,7 @@ st.set_page_config(
 )
 
 # ══════════════════════════════════════════════════════════════
-# CSS
+# CSS — Sembunyikan semua elemen Streamlit branding
 # ══════════════════════════════════════════════════════════════
 st.markdown("""
 <style>
@@ -38,7 +38,93 @@ html, body, [class*="css"], .stApp {
     color: #111827 !important;
 }
 .block-container { padding: 0 2rem 3rem !important; max-width: 1200px; }
-#MainMenu, footer, header { visibility: hidden; }
+
+/* ══════════════════════════════════════════════
+   SEMBUNYIKAN SEMUA ELEMEN STREAMLIT BRANDING
+   ══════════════════════════════════════════════ */
+
+/* Navbar atas (hamburger menu) */
+#MainMenu { visibility: hidden !important; display: none !important; }
+
+/* Footer bawah Streamlit */
+footer { visibility: hidden !important; display: none !important; }
+
+/* Header Streamlit */
+header { visibility: hidden !important; display: none !important; }
+
+/* Toolbar kanan atas (deploy, settings, dll) */
+[data-testid="stToolbar"] {
+    visibility: hidden !important;
+    display: none !important;
+}
+
+/* Badge Streamlit pojok kanan bawah (mahkota merah) */
+[data-testid="stDecoration"] {
+    visibility: hidden !important;
+    display: none !important;
+}
+
+/* Deploy button */
+.stDeployButton {
+    visibility: hidden !important;
+    display: none !important;
+}
+
+/* Status widget (spinner running indicator) */
+[data-testid="stStatusWidget"] {
+    visibility: hidden !important;
+    display: none !important;
+}
+
+/* Streamlit viewer badge / logo bottom right */
+.viewerBadge_container__r5tak {
+    visibility: hidden !important;
+    display: none !important;
+}
+.viewerBadge_link__qRIco {
+    visibility: hidden !important;
+    display: none !important;
+}
+
+/* Catch-all untuk badge viewer dengan class yang berubah-ubah */
+[class*="viewerBadge"] {
+    visibility: hidden !important;
+    display: none !important;
+}
+
+/* GitHub/profile avatar pojok kiri bawah */
+[data-testid="stAppViewBlockContainer"] ~ div[style*="position: fixed"] {
+    display: none !important;
+}
+
+/* Streamlit community cloud bottom bar */
+[data-testid="collapsedControl"] {
+    display: none !important;
+}
+
+/* Garis dekorasi merah di atas (Streamlit top bar) */
+#stDecoration {
+    display: none !important;
+}
+
+/* Semua elemen fixed position di pojok layar yang bukan milik kita */
+.css-1dp5vir, .css-14xtw13, .e8zbici0 {
+    display: none !important;
+}
+
+/* Iframe badge jika ada */
+.streamlit-badge {
+    display: none !important;
+}
+
+/* Powered by Streamlit text */
+[class*="powered"] {
+    display: none !important;
+}
+
+/* ══════════════════════════════════════════════
+   STYLE KOMPONEN APP
+   ══════════════════════════════════════════════ */
 
 .topbar {
     background: linear-gradient(135deg, #1a1f3a 0%, #1e3a8a 60%, #1d4ed8 100%);
@@ -147,8 +233,6 @@ html, body, [class*="css"], .stApp {
 .stat-box { flex: 1; background: #fff; border: 1.5px solid #e2e8f0; border-radius: 11px; padding: 0.75rem 0.5rem; text-align: center; box-shadow: 0 1px 4px rgba(0,0,0,0.04); }
 .stat-v { font-size: 1.3rem; font-weight: 800; display: block; color: #111827; }
 .stat-l { font-size: 0.55rem; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; color: #6b7280; display: block; margin-top: 0.1rem; }
-
-/* History card */
 .hcard { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 0.8rem; margin-bottom: 0.6rem; display: flex; align-items: center; gap: 0.75rem; box-shadow: 0 1px 4px rgba(0,0,0,0.04); }
 .hcard-b3   { border-left: 3px solid #ef4444; }
 .hcard-safe { border-left: 3px solid #22c55e; }
@@ -165,10 +249,7 @@ html, body, [class*="css"], .stApp {
 .hist-empty { text-align: center; padding: 2.5rem 1rem; background: #fafbff; border: 1.5px dashed #e2e8f0; border-radius: 12px; }
 .hist-empty-icon { font-size: 2rem; margin-bottom: 0.4rem; }
 .hist-empty-text { font-size: 0.78rem; color: #6b7280; line-height: 1.6; }
-
-/* Action row in history card */
 .hcard-actions { display: flex; gap: 0.4rem; flex-shrink: 0; flex-direction: column; }
-
 .streamlit-expanderHeader p { color: #111827 !important; font-weight: 600 !important; }
 .js-plotly-plot .plotly { background: transparent !important; }
 [data-testid="stImage"] img { border-radius: 12px !important; }
@@ -176,8 +257,6 @@ p, span, div, li, label, h1, h2, h3, h4, h5, h6 { color: #111827; }
 .stMarkdown p { color: #111827 !important; }
 .stCaption { color: #6b7280 !important; }
 code { background: #f1f5f9 !important; color: #4338ca !important; border-radius: 4px; }
-
-/* Download & delete buttons in history */
 .stDownloadButton button {
     border-radius: 7px !important; font-size: 0.7rem !important;
     font-weight: 600 !important; padding: 0.3rem 0.6rem !important;
@@ -189,6 +268,85 @@ code { background: #f1f5f9 !important; color: #4338ca !important; border-radius:
 </style>
 """, unsafe_allow_html=True)
 
+# ══════════════════════════════════════════════════════════════
+# INJECT JS — Hapus elemen Streamlit branding via DOM
+# (CSS saja kadang tidak cukup karena class name berubah tiap versi)
+# ══════════════════════════════════════════════════════════════
+components.html("""
+<script>
+(function hideBranding() {
+    function remove() {
+        // Toolbar kanan atas
+        const toolbar = document.querySelector('[data-testid="stToolbar"]');
+        if (toolbar) toolbar.style.display = 'none';
+
+        // Deploy button
+        const deploy = document.querySelector('.stDeployButton');
+        if (deploy) deploy.style.display = 'none';
+
+        // Status widget
+        const status = document.querySelector('[data-testid="stStatusWidget"]');
+        if (status) status.style.display = 'none';
+
+        // Decoration bar merah di atas
+        const deco = document.getElementById('stDecoration');
+        if (deco) deco.style.display = 'none';
+
+        // Semua elemen yang punya class 'viewerBadge'
+        document.querySelectorAll('[class*="viewerBadge"]').forEach(el => {
+            el.style.display = 'none';
+        });
+
+        // Cari semua fixed-position element di pojok layar
+        // (logo Streamlit & avatar GitHub ada di sini)
+        document.querySelectorAll('body > div').forEach(el => {
+            const style = window.getComputedStyle(el);
+            if (style.position === 'fixed' || style.position === 'absolute') {
+                const rect = el.getBoundingClientRect();
+                const isBottomCorner = rect.bottom >= window.innerHeight - 80;
+                const isCorner = (rect.left < 80 || rect.right > window.innerWidth - 80);
+                if (isBottomCorner && isCorner) {
+                    // Pastikan bukan elemen milik app kita
+                    if (!el.id || !el.id.startsWith('lp-')) {
+                        el.style.display = 'none';
+                    }
+                }
+            }
+        });
+
+        // Footer Streamlit
+        const footer = document.querySelector('footer');
+        if (footer) footer.style.display = 'none';
+
+        // Header Streamlit  
+        const header = document.querySelector('header');
+        if (header) header.style.display = 'none';
+
+        // MainMenu
+        const mainMenu = document.getElementById('MainMenu');
+        if (mainMenu) mainMenu.style.display = 'none';
+    }
+
+    // Jalankan sekarang
+    remove();
+
+    // Jalankan lagi setelah Streamlit selesai render
+    setTimeout(remove, 500);
+    setTimeout(remove, 1500);
+    setTimeout(remove, 3000);
+
+    // Observer untuk menangkap elemen yang muncul belakangan
+    const observer = new MutationObserver(function() {
+        remove();
+    });
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true
+    });
+})();
+</script>
+""", height=0)
+
 
 # ══════════════════════════════════════════════════════════════
 # HELPER — Generate result card image untuk download
@@ -196,10 +354,6 @@ code { background: #f1f5f9 !important; color: #4338ca !important; border-radius:
 def make_result_card(orig_img: Image.Image, overlaid_img: Image.Image,
                      is_b3: bool, confidence: float, timestamp: str,
                      yolo_boxes: list) -> bytes:
-    """
-    Buat gambar kartu hasil klasifikasi untuk didownload.
-    Layout: foto asli + overlay | panel info di kanan
-    """
     CARD_W, CARD_H = 900, 420
     IMG_W           = 480
     PANEL_W         = CARD_W - IMG_W
@@ -212,66 +366,46 @@ def make_result_card(orig_img: Image.Image, overlaid_img: Image.Image,
     card = Image.new("RGB", (CARD_W, CARD_H), BG_COLOR)
     draw = ImageDraw.Draw(card)
 
-    # ── Gambar overlay di kiri ──
     img_resized = overlaid_img.copy()
     img_resized.thumbnail((IMG_W, CARD_H), Image.LANCZOS)
     iw, ih = img_resized.size
-    # Crop / pad ke tepat IMG_W x CARD_H
     bg_img = Image.new("RGB", (IMG_W, CARD_H), (240, 242, 248))
     bg_img.paste(img_resized, ((IMG_W - iw)//2, (CARD_H - ih)//2))
     card.paste(bg_img, (0, 0))
 
-    # ── Panel kanan ──
     px = IMG_W + 1
     draw.rectangle([px, 0, CARD_W, CARD_H], fill=BG_COLOR)
-
-    # Accent top bar
     draw.rectangle([px, 0, CARD_W, 5], fill=ACCENT)
 
-    # Load fonts
     def font(size):
         for name in ["arialbd.ttf","arial.ttf","DejaVuSans-Bold.ttf","DejaVuSans.ttf"]:
             try: return ImageFont.truetype(name, size)
             except: pass
         return ImageFont.load_default()
 
-    f_big   = font(32)
-    f_med   = font(16)
-    f_sm    = font(13)
-    f_xs    = font(11)
+    f_sm = font(13); f_xs = font(11)
 
-    # App label
     draw.text((px + 20, 20), "B3 Waste Detector", font=font(13), fill=TEXT_MID)
-
-    # Verdict icon + text
     verdict_txt = "BERBAHAYA" if is_b3 else "AMAN"
     icon_txt    = "☣" if is_b3 else "✓"
-    draw.rectangle([px+20, 50, CARD_W-20, 130], fill=ACCENT_LIGHT,
-                   outline=ACCENT, width=2)
-
+    draw.rectangle([px+20, 50, CARD_W-20, 130], fill=ACCENT_LIGHT, outline=ACCENT, width=2)
     draw.text((px + 30, 62), icon_txt, font=font(36), fill=ACCENT)
     label = "B3" if is_b3 else "non-B3"
     draw.text((px + 80, 62), label, font=font(34), fill=ACCENT)
     draw.text((px + 80, 102), verdict_txt, font=font(14), fill=ACCENT)
 
-    # Confidence
     conf_pct = f"{confidence:.1%}"
     draw.text((px + 20, 148), "Keyakinan Model", font=f_xs, fill=TEXT_MID)
     draw.text((px + 20, 164), conf_pct, font=font(28), fill=TEXT_DARK)
 
-    # Progress bar confidence
     bar_x1, bar_y = px+20, 200
     bar_w = PANEL_W - 40
-    draw.rectangle([bar_x1, bar_y, bar_x1+bar_w, bar_y+8],
-                   fill=(230, 232, 240), outline=None)
+    draw.rectangle([bar_x1, bar_y, bar_x1+bar_w, bar_y+8], fill=(230, 232, 240))
     fill_w = int(bar_w * confidence)
     if fill_w > 0:
         draw.rectangle([bar_x1, bar_y, bar_x1+fill_w, bar_y+8], fill=ACCENT)
 
-    # Divider
     draw.line([(px+20, 222), (CARD_W-20, 222)], fill=(230, 232, 240), width=1)
-
-    # YOLO objects
     draw.text((px+20, 232), "Objek Terdeteksi", font=f_xs, fill=TEXT_MID)
     if yolo_boxes:
         obj_names = list(dict.fromkeys([b[5] for b in yolo_boxes if len(b)>5]))[:4]
@@ -280,17 +414,9 @@ def make_result_card(orig_img: Image.Image, overlaid_img: Image.Image,
     else:
         draw.text((px+20, 250), "—", font=f_sm, fill=TEXT_MID)
 
-    # Divider
     draw.line([(px+20, 322), (CARD_W-20, 322)], fill=(230, 232, 240), width=1)
-
-    # Timestamp
     draw.text((px+20, 332), timestamp, font=f_xs, fill=TEXT_MID)
-
-    # Watermark bottom right
-    wm = "AI Classification Result"
-    draw.text((CARD_W - 160, CARD_H - 22), wm, font=f_xs, fill=(200, 205, 215))
-
-    # Thin border around whole card
+    draw.text((CARD_W - 160, CARD_H - 22), "AI Classification Result", font=f_xs, fill=(200, 205, 215))
     draw.rectangle([0, 0, CARD_W-1, CARD_H-1], outline=(220, 224, 235), width=1)
 
     buf = io.BytesIO()
@@ -315,7 +441,6 @@ def save_to_localstorage(entry_json: str):
     </script>""", height=0)
 
 def delete_from_localstorage(entry_id: str):
-    """Inject JS untuk hapus satu entri dari localStorage."""
     components.html(f"""<script>
     (function(){{
         const K='{STORAGE_KEY}';
@@ -525,7 +650,7 @@ def render_safe_explanation():
 
 
 # ══════════════════════════════════════════════════════════════
-# INIT
+# INIT MODELS
 # ══════════════════════════════════════════════════════════════
 with st.spinner("⚙️ Memuat model AI..."):
     try: model = load_classifier()
@@ -538,11 +663,9 @@ with st.spinner("⚙️ Memuat YOLOv8..."):
 
 THRESHOLD = 0.50
 
-# Handle delete action (diproses sebelum render)
 if st.session_state.delete_id:
     del_id = st.session_state.delete_id
-    st.session_state.history = [h for h in st.session_state.history
-                                  if h["id"] != del_id]
+    st.session_state.history = [h for h in st.session_state.history if h["id"] != del_id]
     st.session_state.overlaid_imgs.pop(del_id, None)
     st.session_state.orig_imgs.pop(del_id, None)
     delete_from_localstorage(del_id)
@@ -654,7 +777,6 @@ with tab_detect:
             else:
                 st.caption(f"Klasifikasi MobileNetV2: **:{warna}[{label_txt}]**")
 
-            # ── Download result card gambar ────────────────────────
             conf_val = round((1-pred_proba) if is_b3 else pred_proba, 4)
             ts_now   = datetime.now().strftime("%d %b %Y, %H:%M")
             card_img = make_result_card(img_source, overlaid, is_b3,
@@ -668,7 +790,6 @@ with tab_detect:
                 use_container_width=True,
             )
 
-            # Simpan riwayat
             entry = build_entry(img_source, is_b3, pred_proba, yolo_boxes, input_source)
             if st.session_state.last_saved_id != entry["id"]:
                 st.session_state.history.insert(0, entry)
@@ -785,7 +906,6 @@ with tab_history:
     n_b3    = sum(1 for h in history if h["is_b3"])
     n_safe  = n_total - n_b3
 
-    # ── Header + hapus semua ──────────────────────────────────
     hcol1, hcol2 = st.columns([2, 1])
     with hcol1:
         st.markdown(f"""
@@ -806,7 +926,6 @@ with tab_history:
     st.info("💾 **Riwayat tersimpan di browser kamu** — tetap ada meski halaman di-refresh, "
             "tapi tidak terlihat di perangkat lain.", icon="ℹ️")
 
-    # ── localStorage viewer (JS) ──────────────────────────────
     components.html(f"""
     <div id="ls-root" style="font-family:'Plus Jakarta Sans',sans-serif;"></div>
     <script>
@@ -877,7 +996,6 @@ with tab_history:
 
     st.markdown('<div class="hdiv"></div>', unsafe_allow_html=True)
 
-    # ── Sesi sekarang ──────────────────────────────────────────
     if n_total > 0:
         st.markdown(f"""
         <p style="font-size:0.64rem;font-weight:700;letter-spacing:0.12em;
@@ -898,7 +1016,6 @@ with tab_history:
             </div>
         </div>""", unsafe_allow_html=True)
 
-        # ── Kartu riwayat sesi + download per-item + hapus per-item ──
         for entry in history:
             b3     = entry["is_b3"]
             eid    = entry["id"]
@@ -912,7 +1029,6 @@ with tab_history:
             t_html = (f'<img class="hcard-img" src="data:image/jpeg;base64,{thumb}"/>'
                       if thumb else '<div class="hcard-img"></div>')
 
-            # Render kartu HTML (tanpa tombol — Streamlit handle tombol)
             st.markdown(f"""
             <div class="hcard {card_c}">
                 {t_html}
@@ -926,13 +1042,10 @@ with tab_history:
                 </div>
             </div>""", unsafe_allow_html=True)
 
-            # Tombol download + hapus per item
             btn_a, btn_b = st.columns(2)
             with btn_a:
-                # Buat result card image dari data tersimpan
                 overlaid_img = st.session_state.overlaid_imgs.get(eid)
                 orig_img     = st.session_state.orig_imgs.get(eid)
-
                 if overlaid_img is not None and orig_img is not None:
                     card_bytes = make_result_card(
                         orig_img, overlaid_img, b3,
@@ -943,36 +1056,28 @@ with tab_history:
                                 f"{entry.get('timestamp','').replace(' ','_').replace(',','')}.png")
                     st.download_button(
                         label="⬇️ Download Gambar",
-                        data=card_bytes,
-                        file_name=dl_fname,
-                        mime="image/png",
-                        key=f"dl_{eid}",
+                        data=card_bytes, file_name=dl_fname,
+                        mime="image/png", key=f"dl_{eid}",
                         use_container_width=True,
                     )
-                else:
-                    # Gambar sudah tidak ada di memory, buat dari thumbnail
-                    if thumb:
-                        img_data = base64.b64decode(thumb)
-                        thumb_img = Image.open(io.BytesIO(img_data)).convert("RGB")
-                        card_bytes = make_result_card(
-                            thumb_img, thumb_img, b3,
-                            entry["confidence"], entry.get("timestamp",""),
-                            [(0,0,0,0,0,o) for o in entry.get("objects",[])]
-                        )
-                        st.download_button(
-                            label="⬇️ Download Gambar",
-                            data=card_bytes,
-                            file_name=f"hasil_{eid}.png",
-                            mime="image/png",
-                            key=f"dl_{eid}",
-                            use_container_width=True,
-                        )
-
+                elif thumb:
+                    img_data  = base64.b64decode(thumb)
+                    thumb_img = Image.open(io.BytesIO(img_data)).convert("RGB")
+                    card_bytes = make_result_card(
+                        thumb_img, thumb_img, b3,
+                        entry["confidence"], entry.get("timestamp",""),
+                        [(0,0,0,0,0,o) for o in entry.get("objects",[])]
+                    )
+                    st.download_button(
+                        label="⬇️ Download Gambar",
+                        data=card_bytes, file_name=f"hasil_{eid}.png",
+                        mime="image/png", key=f"dl_{eid}",
+                        use_container_width=True,
+                    )
             with btn_b:
                 if st.button("🗑️ Hapus", key=f"del_{eid}", use_container_width=True):
                     st.session_state.delete_id = eid
                     st.rerun()
-
     else:
         st.markdown("""
         <div class="hist-empty">
