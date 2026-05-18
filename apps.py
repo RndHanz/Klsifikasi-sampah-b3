@@ -103,7 +103,7 @@ html, body, [class*="css"], .stApp {
     background: #f9fafb !important; border: 2px dashed #d1d5db !important;
     border-radius: 12px !important;
 }
-.hdiv { height: 1px; background: linear-gradient(90deg,transparent,#e2e8f0,transparent); margin: 1rem 0; }
+.hdiv { height: 1px; background: linear-gradient(90deg,transparent,#e2e8f0,transparent); margin: 0.2rem 0; }
 .det-label {
     font-size: 0.64rem; font-weight: 700; letter-spacing: 0.12em;
     text-transform: uppercase; color: #6b7280; margin: 0.8rem 0 0.4rem;
@@ -786,22 +786,12 @@ with tab_history:
     n_safe  = n_total - n_b3
 
     # ── Header + hapus semua ──────────────────────────────────
-    hcol1, hcol2 = st.columns([2, 1])
-    with hcol1:
-        st.markdown(f"""
-        <div class="hist-head">
-            <span class="hist-head-title">📋 Riwayat Klasifikasi</span>
-            <span class="hist-count">{n_total} entri sesi ini</span>
-        </div>""", unsafe_allow_html=True)
-    with hcol2:
-        if n_total > 0:
-            if st.button("🗑️ Hapus Semua Sesi", use_container_width=True, type="secondary"):
-                st.session_state.history       = []
-                st.session_state.overlaid_imgs = {}
-                st.session_state.orig_imgs     = {}
-                st.session_state.last_saved_id = None
-                clear_localstorage()
-                st.rerun()
+    # ── Header ────────────────────────────────────────────────
+    st.markdown(f"""
+    <div class="hist-head">
+        <span class="hist-head-title">📋 Riwayat Klasifikasi</span>
+        <span class="hist-count">{n_total} entri sesi ini</span>
+    </div>""", unsafe_allow_html=True)
 
     st.info("💾 **Riwayat tersimpan di browser kamu** — tetap ada meski halaman di-refresh, "
             "tapi tidak terlihat di perangkat lain.", icon="ℹ️")
@@ -861,6 +851,14 @@ with tab_history:
                             <span style="font-size:0.6rem;color:#9ca3af">${{e.timestamp||''}}</span>
                         </div>
                     </div>
+                    
+                    <button onclick="if(confirm('Hapus item ini?')) {{
+                        let data = JSON.parse(localStorage.getItem('{STORAGE_KEY}'));
+                        data = data.filter(x => x.id !== '${{e.id}}');
+                        localStorage.setItem('{STORAGE_KEY}', JSON.stringify(data));
+                        location.reload();
+                    }}" style="background:transparent; border:none; font-size:1.1rem; cursor:pointer; padding:0.4rem; border-radius:8px; display:flex; align-items:center; justify-content:center;" onmouseover="this.style.background='#fee2e2'" onmouseout="this.style.background='transparent'" title="Hapus riwayat">🗑️</button>
+                    
                 </div>`;}}).join('')}}
             ${{h.length>30?`<p style="text-align:center;font-size:0.72rem;color:#6b7280;margin:0.5rem 0">... dan ${{h.length-30}} entri lainnya</p>`:''}}
             <button onclick="if(confirm('Hapus semua riwayat di perangkat ini?')){{localStorage.removeItem('{STORAGE_KEY}');location.reload();}}"
@@ -873,7 +871,7 @@ with tab_history:
         </div>`;
     }})();
     </script>
-    """, height=620, scrolling=True)
+    """, height=320, scrolling=True)
 
     st.markdown('<div class="hdiv"></div>', unsafe_allow_html=True)
 
@@ -928,7 +926,16 @@ with tab_history:
 
             # Tombol download + hapus per item
             btn_a, btn_b = st.columns(2)
+            
             with btn_a:
+                # ... (kode download_button yang sudah ada biarkan saja) ...
+                pass # (Ini hanya penanda, biarkan kode aslinya)
+                
+            with btn_b:
+                # Tambahkan logika hapus per item di sini
+                if st.button("🗑️ Hapus", key=f"del_{eid}", use_container_width=True):
+                    st.session_state.delete_id = eid
+                    st.rerun()
                 # Buat result card image dari data tersimpan
                 overlaid_img = st.session_state.overlaid_imgs.get(eid)
                 orig_img     = st.session_state.orig_imgs.get(eid)
@@ -967,11 +974,6 @@ with tab_history:
                             key=f"dl_{eid}",
                             use_container_width=True,
                         )
-
-            with btn_b:
-                if st.button("🗑️ Hapus", key=f"del_{eid}", use_container_width=True):
-                    st.session_state.delete_id = eid
-                    st.rerun()
 
     else:
         st.markdown("""
