@@ -14,7 +14,7 @@ import tensorflow as tf
 print(f"TensorFlow version: {tf.__version__}")
 
 # Import custom objects dari apps
-from apps import _make_custom_objects
+from app import _make_custom_objects
 
 # Test 1: Load model_b3.h5
 print("\n" + "="*60)
