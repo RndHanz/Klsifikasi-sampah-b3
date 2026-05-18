@@ -99,9 +99,35 @@ html, body, [class*="css"], .stApp {
     color: white !important; border: none !important;
     border-radius: 8px !important; font-weight: 600 !important; font-size: 0.8rem !important;
 }
-[data-testid="stFileUploader"] {
-    background: #f9fafb !important; border: 2px dashed #d1d5db !important;
+/* Mengatur kotak background (rectangle) agar putih dan teksnya hitam */
+[data-testid="stFileUploader"] > section {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border: 2px dashed #d1d5db !important;
     border-radius: 12px !important;
+}
+
+/* Mengatur tombol "Upload" / "Browse files" agar serasi */
+[data-testid="stFileUploader"] button {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border: 1px solid #d1d5db !important;
+    font-weight: 600 !important;
+    border-radius: 8px !important;
+}
+
+/* Memberi efek hover saat kursor diarahkan ke tombol */
+[data-testid="stFileUploader"] button:hover {
+    background-color: #f3f4f6 !important;
+    border-color: #9ca3af !important;
+}
+
+/* Mengatur teks keterangan limit (misal: 200MB per file) */
+[data-testid="stFileUploader"] small, 
+[data-testid="stFileUploader"] span {
+    color: #4b5563 !important;
+}
+            
 }
 .hdiv { height: 1px; background: linear-gradient(90deg,transparent,#e2e8f0,transparent); margin: 0.2rem 0; }
 .det-label {
@@ -925,55 +951,43 @@ with tab_history:
             </div>""", unsafe_allow_html=True)
 
             # Tombol download + hapus per item
-            btn_a, btn_b = st.columns(2)
-            
-            with btn_a:
-                # ... (kode download_button yang sudah ada biarkan saja) ...
-                pass # (Ini hanya penanda, biarkan kode aslinya)
-                
-            with btn_b:
-                # Tambahkan logika hapus per item di sini
-                if st.button("🗑️ Hapus", key=f"del_{eid}", use_container_width=True):
-                    st.session_state.delete_id = eid
-                    st.rerun()
-                # Buat result card image dari data tersimpan
-                overlaid_img = st.session_state.overlaid_imgs.get(eid)
-                orig_img     = st.session_state.orig_imgs.get(eid)
+            # ── Tombol Download per item (Tanpa Hapus) ──
+            overlaid_img = st.session_state.overlaid_imgs.get(eid)
+            orig_img     = st.session_state.orig_imgs.get(eid)
 
-                if overlaid_img is not None and orig_img is not None:
+            if overlaid_img is not None and orig_img is not None:
+                card_bytes = make_result_card(
+                    orig_img, overlaid_img, b3,
+                    entry["confidence"], entry.get("timestamp",""),
+                    [(0,0,0,0,0,o) for o in entry.get("objects",[])]
+                )
+                dl_fname = (f"hasil_{'B3' if b3 else 'nonB3'}_"
+                            f"{entry.get('timestamp','').replace(' ','_').replace(',','')}.png")
+                st.download_button(
+                    label="⬇️ Download Gambar",
+                    data=card_bytes,
+                    file_name=dl_fname,
+                    mime="image/png",
+                    key=f"dl_{eid}",
+                    use_container_width=True,
+                )
+            else:
+                if thumb:
+                    img_data = base64.b64decode(thumb)
+                    thumb_img = Image.open(io.BytesIO(img_data)).convert("RGB")
                     card_bytes = make_result_card(
-                        orig_img, overlaid_img, b3,
+                        thumb_img, thumb_img, b3,
                         entry["confidence"], entry.get("timestamp",""),
                         [(0,0,0,0,0,o) for o in entry.get("objects",[])]
                     )
-                    dl_fname = (f"hasil_{'B3' if b3 else 'nonB3'}_"
-                                f"{entry.get('timestamp','').replace(' ','_').replace(',','')}.png")
                     st.download_button(
                         label="⬇️ Download Gambar",
                         data=card_bytes,
-                        file_name=dl_fname,
+                        file_name=f"hasil_{eid}.png",
                         mime="image/png",
                         key=f"dl_{eid}",
                         use_container_width=True,
                     )
-                else:
-                    # Gambar sudah tidak ada di memory, buat dari thumbnail
-                    if thumb:
-                        img_data = base64.b64decode(thumb)
-                        thumb_img = Image.open(io.BytesIO(img_data)).convert("RGB")
-                        card_bytes = make_result_card(
-                            thumb_img, thumb_img, b3,
-                            entry["confidence"], entry.get("timestamp",""),
-                            [(0,0,0,0,0,o) for o in entry.get("objects",[])]
-                        )
-                        st.download_button(
-                            label="⬇️ Download Gambar",
-                            data=card_bytes,
-                            file_name=f"hasil_{eid}.png",
-                            mime="image/png",
-                            key=f"dl_{eid}",
-                            use_container_width=True,
-                        )
 
     else:
         st.markdown("""
